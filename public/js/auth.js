@@ -1,0 +1,136 @@
+// ============================================================================
+// SMP PCI - Autenticação
+// ============================================================================
+
+class AuthManager {
+    static get baseUrl() {
+        if (window.location.protocol === 'file:') {
+            return 'http://localhost:3000/api';
+        }
+        return `${window.location.origin}/api`;
+    }
+
+    /**
+     * Fazer requisição autenticada
+     */
+    static async fetchWithAuth(url, options = {}) {
+        const token = localStorage.getItem('smp_token');
+
+        if (!token) {
+            throw new Error('Token não encontrado. Faça login novamente.');
+        }
+
+        const headers = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            ...options.headers
+        };
+
+        const response = await fetch(url, {
+            ...options,
+            headers
+        });
+
+        if (response.status === 401) {
+            localStorage.removeItem('smp_token');
+            window.location.href = '/';
+            throw new Error('Sessão expirada. Faça login novamente.');
+        }
+
+        return response;
+    }
+
+    /**
+     * Fazer requisição GET autenticada
+     */
+    static async get(endpoint) {
+        const response = await this.fetchWithAuth(`${this.baseUrl}${endpoint}`);
+        if (!response.ok) {
+            throw new Error(`Erro na requisição: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    /**
+     * Fazer requisição POST autenticada
+     */
+    static async post(endpoint, data) {
+        const response = await this.fetchWithAuth(`${this.baseUrl}${endpoint}`, {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erro ao enviar dados');
+        }
+
+        return await response.json();
+    }
+
+    /**
+     * Fazer requisição PUT autenticada
+     */
+    static async put(endpoint, data) {
+        const response = await this.fetchWithAuth(`${this.baseUrl}${endpoint}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erro ao atualizar dados');
+        }
+
+        return await response.json();
+    }
+
+    /**
+     * Fazer requisição DELETE autenticada
+     */
+    static async delete(endpoint) {
+        const response = await this.fetchWithAuth(`${this.baseUrl}${endpoint}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            throw new Error(`Erro ao deletar: ${response.status}`);
+        }
+
+        return await response.json();
+    }
+
+    /**
+     * Alterar senha
+     */
+    static async changePassword(senhaAtual, novaSenha) {
+        return this.post('/auth/alterar-senha', {
+            senhaAtual,
+            novaSenha
+        });
+    }
+
+    /**
+     * Obter perfil do usuário
+     */
+    static async getProfile() {
+        return this.get('/auth/perfil');
+    }
+
+    /**
+     * Listar usuários (apenas admin)
+     */
+    static async listUsers() {
+        return this.get('/auth/usuarios');
+    }
+
+    /**
+     * Registrar novo usuário (apenas admin)
+     */
+    static async registerUser(data) {
+        return this.post('/auth/registrar', data);
+    }
+}
+
+// Alias para facilitar uso
+const api = AuthManager;

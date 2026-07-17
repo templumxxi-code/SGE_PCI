@@ -1,0 +1,365 @@
+/* ============================================================================
+   SMP PCI - Responsividade
+   ============================================================================ */
+
+/* ============================================================================
+   Tablets (768px)
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    :root {
+        --spacing-xs: 3px;
+        --spacing-sm: 6px;
+        --spacing-md: 12px;
+        --spacing-lg: 18px;
+        --spacing-xl: 24px;
+        --spacing-xxl: 36px;
+        
+        --font-size-sm: 11px;
+        --font-size-base: 13px;
+        --font-size-md: 15px;
+        --font-size-lg: 17px;
+        --font-size-xl: 22px;
+        --font-size-xxl: 28px;
+    }
+
+    .header-top {
+        flex-wrap: wrap;
+        padding: var(--spacing-md);
+    }
+
+    .header-actions {
+        width: 100%;
+        order: 3;
+    }
+
+    .search-box {
+        max-width: none;
+    }
+
+    .dashboard-nav {
+        flex-wrap: wrap;
+        padding: 0 var(--spacing-md);
+    }
+
+    .nav-item {
+        padding: var(--spacing-sm) var(--spacing-md);
+        font-size: var(--font-size-sm);
+    }
+
+    .metrics-grid {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: var(--spacing-md);
+    }
+
+    .metric-card {
+        padding: var(--spacing-md);
+    }
+
+    .metric-value {
+        font-size: var(--font-size-xl);
+    }
+
+    .charts-container {
+        grid-template-columns: 1fr;
+    }
+
+    .bpm-phases {
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: var(--spacing-md);
+    }
+
+    .phase-header {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+
+    .phase-header h3 {
+        font-size: var(--font-size-md);
+    }
+
+    .phase-count {
+        font-size: var(--font-size-lg);
+    }
+
+    .processes-list {
+        grid-template-columns: 1fr;
+    }
+
+    .filter-bar {
+        flex-direction: column;
+    }
+
+    .search-input,
+    .filter-select {
+        width: 100%;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .data-table {
+        font-size: var(--font-size-sm);
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: var(--spacing-sm);
+    }
+
+    .login-box {
+        padding: var(--spacing-lg);
+        max-width: 90%;
+    }
+
+    .reports-container {
+        grid-template-columns: 1fr;
+    }
+
+    .report-filters {
+        flex-direction: column;
+    }
+
+    .date-input {
+        width: 100%;
+    }
+
+    .modal-content {
+        width: 95%;
+    }
+
+    .user-profile {
+        display: none;
+    }
+
+    .btn-notification {
+        margin-left: auto;
+    }
+}
+
+/* ============================================================================
+   Smartphone (480px)
+   ============================================================================ */
+
+@media (max-width: 480px) {
+    :root {
+        --spacing-xs: 2px;
+        --spacing-sm: 4px;
+        --spacing-md: 8px;
+        --spacing-lg: 12px;
+        --spacing-xl: 16px;
+        --spacing-xxl: 24px;
+        
+        --font-size-sm: 10px;
+        --font-size-base: 12px;
+        --font-size-md: 13px;
+        --font-size-lg: 15px;
+        --font-size-xl: 20px;
+        --font-size-xxl: 24px;
+    }
+
+    body {
+        font-size: var(--font-size-base);
+    }
+
+    .dashboard-content {
+        padding: var(--spacing-md);
+    }
+
+    .header-top {
+        padding: var(--spacing-sm);
+        gap: var(--spacing-sm);
+    }
+
+    .logo-area {
+        font-size: var(--font-size-md);
+        gap: var(--spacing-sm);
+    }
+
+    .logo-area i {
+        font-size: var(--font-size-lg);
+    }
+
+    .search-box {
+        display: none;
+    }
+
+    .user-info {
+        display: none;
+    }
+
+    .dashboard-nav {
+        padding: 0 var(--spacing-sm);
+        gap: var(--spacing-sm);
+    }
+
+    .nav-item {
+        padding: var(--spacing-sm);
+        font-size: var(--font-size-xs);
+    }
+
+    .nav-item i {
+        font-size: var(--font-size-md);
+    }
+
+    .nav-item span {
+        display: none;
+    }
+
+    .metrics-grid {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+    }
+
+    .metric-card {
+        padding: var(--spacing-md);
+    }
+
+    .metric-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .metric-value {
+        font-size: var(--font-size-lg);
+    }
+
+    .bpm-phases {
+        grid-template-columns: 1fr;
+    }
+
+    .phase-progress {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .phase-progress .progress-bar {
+        flex: 1;
+    }
+
+    .process-card {
+        padding: var(--spacing-md);
+    }
+
+    .process-actions {
+        flex-direction: column;
+    }
+
+    .form-section {
+        margin-bottom: var(--spacing-lg);
+    }
+
+    .form-actions {
+        flex-direction: column;
+    }
+
+    .form-actions .btn {
+        width: 100%;
+    }
+
+    .data-table {
+        font-size: var(--font-size-sm);
+    }
+
+    .data-table th {
+        font-size: var(--font-size-xs);
+    }
+
+    .data-table td {
+        padding: var(--spacing-sm);
+    }
+
+    .login-box {
+        padding: var(--spacing-md);
+    }
+
+    .login-header h1 {
+        font-size: var(--font-size-lg);
+    }
+
+    .btn {
+        padding: var(--spacing-sm);
+        font-size: var(--font-size-base);
+    }
+
+    .dropdown-menu {
+        min-width: 150px;
+    }
+
+    .modal-content {
+        border-radius: var(--border-radius);
+    }
+
+    .modal-header,
+    .modal-body,
+    .modal-footer {
+        padding: var(--spacing-md);
+    }
+
+    h1 { font-size: var(--font-size-lg); }
+    h2 { font-size: var(--font-size-md); }
+    h3 { font-size: var(--font-size-base); }
+    h4 { font-size: var(--font-size-sm); }
+
+    .subtitle {
+        font-size: var(--font-size-base);
+    }
+}
+
+/* ============================================================================
+   Modo Escuro (Opcional)
+   ============================================================================ */
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --color-bg: #1a1a2e;
+        --color-bg-secondary: #16213e;
+        --color-text: #eaeaea;
+        --color-text-secondary: #b0b0b0;
+        --color-border: #2d3561;
+        --color-white: #0f3460;
+    }
+}
+
+/* ============================================================================
+   Impressão (Print)
+   ============================================================================ */
+
+@media print {
+    body {
+        background-color: white;
+    }
+
+    .dashboard-header,
+    .dashboard-nav,
+    .btn,
+    .search-box,
+    .user-menu {
+        display: none;
+    }
+
+    .dashboard-content {
+        padding: 0;
+    }
+
+    .modal {
+        display: none;
+    }
+
+    .chart-card,
+    .table-card {
+        page-break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid #999;
+    }
+
+    .data-table {
+        border-collapse: collapse;
+    }
+
+    .data-table th,
+    .data-table td {
+        border: 1px solid #999;
+    }
+}

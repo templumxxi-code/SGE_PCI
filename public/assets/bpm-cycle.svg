@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600">
+  <defs>
+    <style>
+      .label { font-family: Inter, Arial, sans-serif; font-size:22px; font-weight:700; fill:#111; }
+      .subtitle { font-size:16px; fill:#444; }
+    </style>
+  </defs>
+  <rect width="100%" height="100%" fill="#fff"/>
+  <g transform="translate(600,300)">
+    <!-- five slices as arcs approximated by paths -->
+    <path d="M0,0 L0,-180 A180,180 0 0,1 170,-70 Z" fill="#4CAF50"/>
+    <path d="M0,0 L170,-70 A180,180 0 0,1 170,70 Z" fill="#2196F3"/>
+    <path d="M0,0 L170,70 A180,180 0 0,1 -10,180 Z" fill="#FFC107"/>
+    <path d="M0,0 L-10,180 A180,180 0 0,1 -170,70 Z" fill="#FF5722"/>
+    <path d="M0,0 L-170,70 A180,180 0 0,1 0,-180 Z" fill="#00BCD4"/>
+
+    <!-- labels positioned around the pie -->
+    <text x="140" y="-120" class="label">Planejar</text>
+    <text x="220" y="-10" class="label">Analisar</text>
+    <text x="60" y="160" class="label">Desenhar</text>
+    <text x="-170" y="160" class="label">Implementar</text>
+    <text x="-300" y="-10" class="label">Monitorar</text>
+
+    <!-- arrows in a circular layout -->
+    <g stroke="#444" stroke-width="8" fill="none" stroke-linecap="round">
+      <path d="M120,-120 180,-140" marker-end="url(#arr)"/>
+      <path d="M260,-10 300,20" marker-end="url(#arr)"/>
+      <path d="M120,160 160,180" marker-end="url(#arr)"/>
+      <path d="M-80,200 -160,220" marker-end="url(#arr)"/>
+      <path d="M-320,20 -260,-20" marker-end="url(#arr)"/>
+    </g>
+
+    <defs>
+      <marker id="arr" markerWidth="10" markerHeight="10" refX="6" refY="5" orient="auto">
+        <path d="M0,0 L10,5 L0,10 z" fill="#444"/>
+      </marker>
+    </defs>
+  </g>
+
+  <text x="600" y="40" text-anchor="middle" class="label">Ciclo de Vida do BPM</text>
+  <text x="600" y="68" text-anchor="middle" class="subtitle">Planejar — Analisar — Desenhar — Implementar — Monitorar</text>
+</svg>

@@ -1,0 +1,39 @@
+{
+  "name": "smp-pci-sistema-monitoramento",
+  "version": "1.0.0",
+  "description": "Sistema de Monitoramento de Processos BPM da Polícia Científica do RN",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "node --test test/functional/*.test.js",
+    "test:roles": "node test/functional/role-access.test.js",
+    "test:security": "node --test test/functional/security-auth.test.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "BPM",
+    "PCI-RN",
+    "Monitoramento",
+    "Processos"
+  ],
+  "author": "PCI-RN",
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.5.2",
+    "helmet": "^8.2.0",
+    "jsonwebtoken": "^9.0.0",
+    "multer": "^1.4.5-lts.1",
+    "pg": "^8.10.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22",
+    "pg-mem": "^3.0.14"
+  }
+}

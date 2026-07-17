@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMP PCI - Sistema de Monitoramento de Processos BPM</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="./assets/favicon.ico">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" type="text/css" href="./css/style.css">
+    <link rel="stylesheet" type="text/css" href="./css/dashboard.css">
+    <link rel="stylesheet" type="text/css" href="./css/responsive.css">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Icons (FontAwesome) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Chart.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+</head>
+<body>
+    <!-- Container Principal -->
+    <div id="app" class="app-container">
+        
+        <!-- Seção de Login -->
+        <section id="login-section" class="login-section active">
+            <div class="login-container">
+                <div class="login-box">
+                    <div class="login-header">
+                        <div class="logo-container">
+                            <i class="fas fa-shield-alt logo-icon"></i>
+                        </div>
+                        <h1>SMP PCI</h1>
+                        <p class="subtitle">Sistema de Monitoramento de Processos BPM</p>
+                        <p class="institution">Polícia Científica do Rio Grande do Norte</p>
+                    </div>
+
+                    <form id="login-form" class="login-form">
+                        <div class="form-group">
+                            <label for="email-input">E-mail</label>
+                            <input 
+                                type="email" 
+                                id="email-input" 
+                                placeholder="Digite seu e-mail"
+                                required
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="password-input">Senha</label>
+                            <input 
+                                type="password" 
+                                id="password-input" 
+                                placeholder="Digite sua senha"
+                                required
+                            >
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-login">
+                            <i class="fas fa-sign-in-alt"></i> Entrar
+                        </button>
+                    </form>
+
+                    <div class="login-footer">
+                        <p class="dev-credentials">
+                            <strong>Credenciais de Teste:</strong><br>
+                            Admin: admin@pci.rn.gov.br / admin123<br>
+                            Setor: setor@pci.rn.gov.br / setor123
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Seção de Dashboard -->
+        <section id="dashboard-section" class="dashboard-section">
+            
+            <!-- Header -->
+            <header class="dashboard-header">
+                <div class="header-top">
+                    <div class="logo-area">
+                        <i class="fas fa-shield-alt"></i>
+                        <span>SMP PCI</span>
+                    </div>
+                    
+                    <div class="header-actions">
+                        <div class="search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" placeholder="Buscar processos...">
+                        </div>
+                        
+                        <div class="user-menu">
+                            <button class="btn-notification">
+                                <i class="fas fa-bell"></i>
+                                <span class="notification-badge">3</span>
+                            </button>
+                            
+                            <div class="user-profile">
+                                <img src="https://via.placeholder.com/32" alt="Usuário" class="user-avatar">
+                                <div class="user-info">
+                                    <span class="user-name">Admin</span>
+                                    <span class="user-role">NGE</span>
+                                </div>
+                                <button class="btn-dropdown" id="user-menu-btn">
+                                    <i class="fas fa-chevron-down"></i>
+                                </button>
+                            </div>
+
+                            <button id="logout-btn-visible" class="btn btn-danger btn-logout-visible">
+                                <i class="fas fa-sign-out-alt"></i> Sair
+                            </button>
+
+                            <div class="dropdown-menu user-dropdown">
+                                <a href="#" class="dropdown-item">
+                                    <i class="fas fa-user"></i> Meu Perfil
+                                </a>
+                                <a href="#" class="dropdown-item">
+                                    <i class="fas fa-cog"></i> Configurações
+                                </a>
+                                <a href="#" class="dropdown-item">
+                                    <i class="fas fa-lock"></i> Alterar Senha
+                                </a>
+                                <hr class="dropdown-divider">
+                                <button id="logout-btn" class="dropdown-item text-danger">
+                                    <i class="fas fa-sign-out-alt"></i> Sair
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navigation Tabs -->
+                <nav class="dashboard-nav">
+                    <button class="nav-item nge-only active" data-tab="dashboard-nge" data-role="NGE">
+                        <i class="fas fa-chart-line"></i> Dashboard NGE
+                    </button>
+                    <button class="nav-item setor-only" data-tab="dashboard-setor" data-role="SETOR">
+                        <i class="fas fa-chart-pie"></i> Dashboard do Setor
+                    </button>
+                    <button class="nav-item common-item" data-tab="meus-processos" data-role="ALL">
+                        <i class="fas fa-tasks"></i> Meus Processos
+                    </button>
+                    <button class="nav-item common-item" data-tab="novo-processo" data-role="ALL">
+                        <i class="fas fa-plus-circle"></i> Novo Processo
+                    </button>
+                    <button class="nav-item common-item" data-tab="monitoramento-bpm" data-role="ALL">
+                        <i class="fas fa-network-wired"></i> Monitoramento BPM
+                    </button>
+                    <button class="nav-item common-item" data-tab="indicadores" data-role="ALL">
+                        <i class="fas fa-gauge-high"></i> Indicadores
+                    </button>
+                    <button class="nav-item nge-only" data-tab="relatorios" data-role="NGE">
+                        <i class="fas fa-file-pdf"></i> Relatórios
+                    </button>
+                    <button class="nav-item nge-only" data-tab="configuracoes" data-role="NGE">
+                        <i class="fas fa-sliders-h"></i> Configurações
+                    </button>
+                </nav>
+            </header>
+
+            <!-- Main Content -->
+            <main class="dashboard-content">
+                
+                <!-- Dashboard NGE -->
+                <div id="dashboard-nge" class="tab-content active">
+                    <h2>Visão Geral Institucional</h2>
+                    <p class="subtitle">Acompanhamento da desempenho geral da Polícia Científica do RN</p>
+                    
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-header">
+                                <h3>Processos Ativos</h3>
+                                <i class="fas fa-tasks icon-primary"></i>
+                            </div>
+                            <div class="metric-value" data-metric="processos-ativos">152</div>
+                            <div class="metric-change positive">
+                                <i class="fas fa-arrow-up"></i> 12% vs mês anterior
+                            </div>
+                        </div>
+
+                        <div class="metric-card">
+                            <div class="metric-header">
+                                <h3>Conformidade Geral</h3>
+                                <i class="fas fa-check-circle icon-success"></i>
+                            </div>
+                            <div class="metric-value" data-metric="conformidade">86%</div>
+                            <div class="metric-change positive">
+                                <i class="fas fa-arrow-up"></i> 5% vs trimestre anterior
+                            </div>
+                        </div>
+
+                        <div class="metric-card">
+                            <div class="metric-header">
+                                <h3>Total de Atividades</h3>
+                                <i class="fas fa-list-check icon-info"></i>
+                            </div>
+                            <div class="metric-value">11,8 mil</div>
+                            <div class="metric-change positive">
+                                <i class="fas fa-arrow-up"></i> 8% vs período anterior
+                            </div>
+                        </div>
+
+                        <div class="metric-card">
+                            <div class="metric-header">
+                                <h3>Alertas Críticos</h3>
+                                <i class="fas fa-exclamation-triangle icon-warning"></i>
+                            </div>
+                            <div class="metric-value">28</div>
+                            <div class="metric-change negative">
+                                <i class="fas fa-arrow-down"></i> 3 resolvidos hoje
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts -->
+                    <div class="charts-container">
+                        <div class="chart-card">
+                            <h3>Conformidade por Fase BPM</h3>
+                            <canvas id="chart-conformidade-fases"></canvas>
+                        </div>
+
+                        <div class="chart-card">
+                            <h3>Distribuição de Processos por Fase</h3>
+                            <canvas id="chart-distribuicao-fases"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Tabela de Processos -->
+                    <div class="table-card">
+                        <h3>Processos com Atenção</h3>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Processo</th>
+                                    <th>Setor</th>
+                                    <th>Fase BPM</th>
+                                    <th>Conformidade</th>
+                                    <th>Status</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-processos-atencao">
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">Carregando dados...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Dashboard Setor -->
+                <div id="dashboard-setor" class="tab-content">
+                    <h2>Dashboard do Setor/Núcleo</h2>
+                    <p class="subtitle">Acompanhamento dos processos do setor</p>
+                    
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-header">
+                                <h3>Meus Processos</h3>
+                                <i class="fas fa-folder-open icon-primary"></i>
+                            </div>
+                            <div class="metric-value" data-metric="processos-setor">12</div>
+                            <div class="metric-label">Ativos neste período</div>
+                        </div>
+
+                        <div class="metric-card">
+                            <div class="metric-header">
+                                <h3>Conformidade Setor</h3>
+                                <i class="fas fa-check-circle icon-success"></i>
+                            </div>
+                            <div class="metric-value" data-metric="conformidade-setor">89%</div>
+                            <div class="metric-label">Média do período</div>
+                        </div>
+
+                        <div class="metric-card">
+                            <div class="metric-header">
+                                <h3>Atividades Pendentes</h3>
+                                <i class="fas fa-hourglass-end icon-warning"></i>
+                            </div>
+                            <div class="metric-value" data-metric="atividades-pendentes-setor">9,6 mil</div>
+                            <div class="metric-label">Aguardando conclusão</div>
+                        </div>
+
+                        <div class="metric-card">
+                            <div class="metric-header">
+                                <h3>Tarefas em Atraso</h3>
+                                <i class="fas fa-clock icon-danger"></i>
+                            </div>
+                            <div class="metric-value" data-metric="tarefas-atraso-setor">5</div>
+                            <div class="metric-change negative">
+                                <i class="fas fa-exclamation"></i> Requerem ação
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="charts-container">
+                        <div class="chart-card">
+                            <h3>Progresso por Fase BPM</h3>
+                            <canvas id="chart-progresso-setor"></canvas>
+                        </div>
+
+                        <div class="chart-card">
+                            <h3>Evolução Temporal</h3>
+                            <canvas id="chart-evolucao-temporal"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Meus Processos -->
+                <div id="meus-processos" class="tab-content">
+                    <h2>Meus Processos</h2>
+                    <p class="subtitle">Visualizar e gerenciar processos</p>
+
+                    <div class="filter-bar">
+                        <input type="text" placeholder="Buscar por nome..." class="search-input">
+                        <select class="filter-select">
+                            <option value="">Todas as fases</option>
+                            <option value="Planejar">Planejar</option>
+                            <option value="Analisar">Analisar</option>
+                            <option value="Desenhar">Desenhar</option>
+                            <option value="Implementar">Implementar</option>
+                            <option value="Monitorar">Monitorar</option>
+                        </select>
+                        <button class="btn btn-secondary">
+                            <i class="fas fa-filter"></i> Filtros Avançados
+                        </button>
+                    </div>
+
+                    <div class="processes-list" id="processes-list">
+                        <div class="loading-spinner">
+                            <i class="fas fa-spinner fa-spin"></i> Carregando processos...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Novo Processo -->
+                <div id="novo-processo" class="tab-content">
+                    <h2>Cadastrar Novo Processo</h2>
+                    <p class="subtitle">Preencha os dados para criar um novo processo</p>
+
+                    <form id="form-novo-processo" class="form-container">
+                        <div class="form-section">
+                            <h3>Informações Básicas</h3>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="nome-processo">Nome do Processo *</label>
+                                    <input type="text" id="nome-processo" placeholder="Digite o nome" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="setor-select">Setor/Núcleo *</label>
+                                    <select id="setor-select" required>
+                                        <option value="">Selecione o setor</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="macroprocesso-select">Macroprocesso *</label>
+                                    <select id="macroprocesso-select" required>
+                                        <option value="">Selecione o macroprocesso</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="responsavel-select">Responsável</label>
+                                    <select id="responsavel-select">
+                                        <option value="">Selecione um responsável</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="observacoes-processo">Observações</label>
+                                <textarea id="observacoes-processo" rows="4" placeholder="Digite observações relevantes"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="reset" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancelar
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Criar Processo
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Monitoramento BPM -->
+                <div id="monitoramento-bpm" class="tab-content">
+                    <h2>Monitoramento BPM</h2>
+                    <p class="subtitle">Acompanhar processos por fase da metodologia BPM</p>
+
+                    <div class="bpm-phases">
+                        <div class="bpm-phase">
+                            <div class="phase-header">
+                                <i class="fas fa-lightbulb"></i>
+                                <h3>Planejar</h3>
+                            </div>
+                            <div class="phase-count">152</div>
+                            <div class="phase-progress">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 100%"></div>
+                                </div>
+                                <span>100%</span>
+                            </div>
+                            <button class="btn btn-small">Ver Detalhes</button>
+                        </div>
+
+                        <div class="bpm-phase">
+                            <div class="phase-header">
+                                <i class="fas fa-microscope"></i>
+                                <h3>Analisar</h3>
+                            </div>
+                            <div class="phase-count">89</div>
+                            <div class="phase-progress">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 58.5%"></div>
+                                </div>
+                                <span>58%</span>
+                            </div>
+                            <button class="btn btn-small">Ver Detalhes</button>
+                        </div>
+
+                        <div class="bpm-phase">
+                            <div class="phase-header">
+                                <i class="fas fa-hammer"></i>
+                                <h3>Desenhar</h3>
+                            </div>
+                            <div class="phase-count">45</div>
+                            <div class="phase-progress">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 30%"></div>
+                                </div>
+                                <span>30%</span>
+                            </div>
+                            <button class="btn btn-small">Ver Detalhes</button>
+                        </div>
+
+                        <div class="bpm-phase">
+                            <div class="phase-header">
+                                <i class="fas fa-rocket"></i>
+                                <h3>Implementar</h3>
+                            </div>
+                            <div class="phase-count">22</div>
+                            <div class="phase-progress">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 15%"></div>
+                                </div>
+                                <span>15%</span>
+                            </div>
+                            <button class="btn btn-small">Ver Detalhes</button>
+                        </div>
+
+                        <div class="bpm-phase">
+                            <div class="phase-header">
+                                <i class="fas fa-eye"></i>
+                                <h3>Monitorar</h3>
+                            </div>
+                            <div class="phase-count">8</div>
+                            <div class="phase-progress">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 5%"></div>
+                                </div>
+                                <span>5%</span>
+                            </div>
+                            <button class="btn btn-small">Ver Detalhes</button>
+                        </div>
+
+                        <!-- Avaliar removido: ciclo adotado com 5 etapas -->
+                    </div>
+                </div>
+
+                <!-- Indicadores -->
+                <div id="indicadores" class="tab-content">
+                    <h2>Indicadores de Desempenho (KPIs)</h2>
+                    <p class="subtitle">Monitore os indicadores chave de desempenho</p>
+
+                    <div class="filter-bar">
+                        <select class="filter-select">
+                            <option value="">Todos os tipos</option>
+                            <option value="Eficiência">Eficiência</option>
+                            <option value="Eficácia">Eficácia</option>
+                            <option value="Conformidade">Conformidade</option>
+                            <option value="Qualidade">Qualidade</option>
+                        </select>
+                    </div>
+
+                    <div class="indicators-grid" id="indicators-grid">
+                        <div class="loading-spinner">
+                            <i class="fas fa-spinner fa-spin"></i> Carregando indicadores...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Relatórios -->
+                <div id="relatorios" class="tab-content">
+                    <h2>Relatórios</h2>
+                    <p class="subtitle">Gerar e exportar relatórios de processos e indicadores</p>
+
+                    <div class="reports-container">
+                        <div class="report-card">
+                            <div class="report-header">
+                                <i class="fas fa-file-csv"></i>
+                                <h3>Relatório de Processos</h3>
+                            </div>
+                            <p>Exportar dados completos de todos os processos em formato CSV ou PDF</p>
+                            <div class="report-filters">
+                                <input type="date" class="date-input">
+                                <input type="date" class="date-input">
+                            </div>
+                            <button class="btn btn-primary" data-report-action="export-processos">
+                                <i class="fas fa-download"></i> Exportar
+                            </button>
+                        </div>
+
+                        <div class="report-card">
+                            <div class="report-header">
+                                <i class="fas fa-chart-bar"></i>
+                                <h3>Relatório de Indicadores</h3>
+                            </div>
+                            <p>Análise detalhada de KPIs por período e setor</p>
+                            <div class="report-filters">
+                                <select class="filter-select">
+                                    <option>Todos os setores</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-primary" data-report-action="export-indicadores">
+                                <i class="fas fa-download"></i> Exportar
+                            </button>
+                        </div>
+
+                        <div class="report-card">
+                            <div class="report-header">
+                                <i class="fas fa-history"></i>
+                                <h3>Histórico de Mudanças</h3>
+                            </div>
+                            <p>Logs de todas as alterações realizadas nos processos</p>
+                            <div class="report-filters">
+                                <input type="date" class="date-input">
+                            </div>
+                            <button class="btn btn-primary" data-report-action="export-historico">
+                                <i class="fas fa-download"></i> Exportar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Configurações -->
+                <div id="configuracoes" class="tab-content">
+                    <h2>Configurações</h2>
+                    <p class="subtitle">Gerenciar configurações do sistema</p>
+
+                    <div class="settings-container">
+                        <div class="settings-section">
+                            <h3>Gerenciamento de Usuários</h3>
+                            <button type="button" class="btn btn-primary" id="show-add-user-form-btn">
+                                <i class="fas fa-user-plus"></i> Adicionar Usuário
+                            </button>
+
+                            <form id="add-user-form" class="user-form" style="margin-top: 1rem; display: none;">
+                                <div class="form-row">
+                                    <label for="new-user-name">Nome completo</label>
+                                    <input id="new-user-name" type="text" required placeholder="Ex: João da Silva" />
+                                </div>
+                                <div class="form-row">
+                                    <label for="new-user-email">E-mail institucional</label>
+                                    <input id="new-user-email" type="email" required placeholder="exemplo@pci.rn.gov.br" />
+                                </div>
+                                <div class="form-row">
+                                    <label for="new-user-password">Senha temporária</label>
+                                    <input id="new-user-password" type="password" required placeholder="Senha inicial" />
+                                </div>
+                                <div class="form-row">
+                                    <label for="new-user-role">Perfil</label>
+                                    <select id="new-user-role" required>
+                                        <option value="NGE">NGE</option>
+                                        <option value="SETOR">SETOR</option>
+                                    </select>
+                                </div>
+                                <div class="form-row">
+                                    <label for="new-user-setor">Setor</label>
+                                    <select id="new-user-setor">
+                                        <option value="">-- Selecione um setor (apenas SETOR) --</option>
+                                        <option value="1">Genética</option>
+                                        <option value="2">Química</option>
+                                        <option value="3">Documentoscopia</option>
+                                        <option value="4">Balística</option>
+                                        <option value="5">Fotografia</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Criar Usuário</button>
+                            </form>
+
+                            <table class="data-table" id="users-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nome</th>
+                                        <th>E-mail</th>
+                                        <th>Perfil</th>
+                                        <th>Setor</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td colspan="5" class="text-center">Carregando usuários...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </section>
+    </div>
+
+    <!-- Modal de Confirmação -->
+    <div id="modal-confirmacao" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Confirmação</h2>
+                <button class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="modal-texto"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
+                <button class="btn btn-primary" id="btn-confirmar">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="./js/auth.js"></script>
+    <script src="./js/utils.js"></script>
+    <script src="./js/processes.js"></script>
+    <script src="./js/indicators.js"></script>
+    <script src="./js/dashboard.js"></script>
+    <script src="./js/reports.js"></script>
+    <script src="./js/settings.js"></script>
+    <script src="./js/app.js"></script>
+</body>
+</html>
