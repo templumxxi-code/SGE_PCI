@@ -228,3 +228,179 @@ test('reset protegido exige banco de teste e ambiente test', async () => {
   assert.ok(result);
   process.env.DB_NAME = original;
 });
+
+// ==================================================
+// ANEXOS - INTEGRAÇÃO COM POSTGRESQL REAL
+// ==================================================
+
+test('[ANEXOS] upload válido persiste com hash SHA-256', async () => {
+  const { body: admin } = await loginAs('admin@pci.rn.gov.br', 'admin123');
+  
+  const pdfBuffer = Buffer.from([0x25, 0x50, 0x44, 0x46, ...Buffer.alloc(1000)]);
+  const file = new File([pdfBuffer], 'doc.pdf', { type: 'application/pdf' });
+  const form = new FormData();
+  form.append('file', file);
+  form.append('tipo', 'POP');
+  
+  const response = await fetch(`http://127.0.0.1:${serverInstance.address().port}/api/processes/1/activities/1/attachments`, {
+    method: 'POST',
+    headers: authHeaders(admin.token),
+    body: form
+  });
+  
+  assert.equal(response.status, 201);
+  const uploadedFile = await response.json();
+  
+  // Verify in database
+  const record = await queryOne(
+    'SELECT id, nome_arquivo, hash_sha256, tamanho_bytes, mime_type FROM anexos WHERE id = $1',
+    [uploadedFile.id]
+  );
+  
+  assert.ok(record, 'Anexo deve estar no banco');
+  assert.equal(record.nome_arquivo, 'doc.pdf');
+  assert.ok(record.hash_sha256.length === 64, 'SHA-256 deve ter 64 caracteres');
+  assert.equal(record.tamanho_bytes, pdfBuffer.length);
+  assert.equal(record.mime_type, 'application/pdf');
+});
+
+test('[ANEXOS] setor A bloqueado em processo de setor B', async () => {
+  const { body: setor } = await loginAs('setor@pci.rn.gov.br', 'setor123');
+  
+  const pdfBuffer = Buffer.from([0x25, 0x50, 0x44, 0x46, ...Buffer.alloc(1000)]);
+  const file = new File([pdfBuffer], 'doc.pdf', { type: 'application/pdf' });
+  const form = new FormData();
+  form.append('file', file);
+  form.append('tipo', 'POP');
+  
+  const response = await fetch(`http://127.0.0.1:${serverInstance.address().port}/api/processes/2/activities/2/attachments`, {
+    method: 'POST',
+    headers: authHeaders(setor.token),
+    body: form
+  });
+  
+  assert.equal(response.status, 403);
+});
+
+test('[ANEXOS] NGE upload em outro setor', async () => {
+  const { body: admin } = await loginAs('admin@pci.rn.gov.br', 'admin123');
+  
+  const pdfBuffer = Buffer.from([0x25, 0x50, 0x44, 0x46, ...Buffer.alloc(1000)]);
+  const file = new File([pdfBuffer], 'doc.pdf', { type: 'application/pdf' });
+  const form = new FormData();
+  form.append('file', file);
+  form.append('tipo', 'POP');
+  
+  const response = await fetch(`http://127.0.0.1:${serverInstance.address().port}/api/processes/2/activities/2/attachments`, {
+    method: 'POST',
+    headers: authHeaders(admin.token),
+    body: form
+  });
+  
+  assert.equal(response.status, 201);
+});
+
+test('[ANEXOS] auditoria UPLOAD_ANEXO persistida no PostgreSQL real', async () => {
+  const { body: admin } = await loginAs('admin@pci.rn.gov.br', 'admin123');
+  
+  const pdfBuffer = Buffer.from([0x25, 0x50, 0x44, 0x46, ...Buffer.alloc(1000)]);
+  const file = new File([pdfBuffer], 'doc.pdf', { type: 'application/pdf' });
+  const form = new FormData();
+  form.append('file', file);
+  form.append('tipo', 'POP');
+  
+  const response = await fetch(`http://127.0.0.1:${serverInstance.address().port}/api/processes/1/activities/1/attachments`, {
+    method: 'POST',
+    headers: authHeaders(admin.token),
+    body: form
+  });
+  
+  const uploadedFile = await response.json();
+  
+  // Verify audit log
+  const logs = await query(
+    'SELECT acao, tabela_afetada, id_registro FROM logs WHERE acao = $1 AND id_registro = $2',
+    ['UPLOAD_ANEXO', uploadedFile.id]
+  );
+  
+  const logRows = logs.rows || logs;
+  assert.ok(logRows.length > 0, 'Log UPLOAD_ANEXO deve existir');
+  assert.equal(logRows[0].tabela_afetada, 'anexos');
+});
+
+test('[ANEXOS] exclusão lógica e download bloqueado', async () => {
+  const { body: admin } = await loginAs('admin@pci.rn.gov.br', 'admin123');
+  
+  const pdfBuffer = Buffer.from([0x25, 0x50, 0x44, 0x46, ...Buffer.alloc(1000)]);
+  const file = new File([pdfBuffer], 'doc.pdf', { type: 'application/pdf' });
+  const form = new FormData();
+  form.append('file', file);
+  form.append('tipo', 'POP');
+  
+  const uploadResponse = await fetch(`http://127.0.0.1:${serverInstance.address().port}/api/processes/1/activities/1/attachments`, {
+    method: 'POST',
+    headers: authHeaders(admin.token),
+    body: form
+  });
+  
+  const uploadedFile = await uploadResponse.json();
+  
+  // Delete
+  const deleteResponse = await fetch(`http://127.0.0.1:${serverInstance.address().port}/api/processes/1/activities/1/attachments/${uploadedFile.id}`, {
+    method: 'DELETE',
+    headers: authHeaders(admin.token)
+  });
+  
+  assert.equal(deleteResponse.status, 200);
+  
+  // Try download
+  const downloadResponse = await fetch(`http://127.0.0.1:${serverInstance.address().port}/api/processes/1/activities/1/attachments/${uploadedFile.id}/download`, {
+    headers: authHeaders(admin.token)
+  });
+  
+  assert.equal(downloadResponse.status, 404);
+});
+
+test('[ANEXOS] NGE download e exclusão em outro setor', async () => {
+  const { body: admin } = await loginAs('admin@pci.rn.gov.br', 'admin123');
+  
+  // Upload em setor B
+  const pdfBuffer = Buffer.from([0x25, 0x50, 0x44, 0x46, ...Buffer.alloc(1000)]);
+  const file = new File([pdfBuffer], 'doc.pdf', { type: 'application/pdf' });
+  const form = new FormData();
+  form.append('file', file);
+  form.append('tipo', 'POP');
+  
+  const uploadResponse = await fetch(`http://127.0.0.1:${serverInstance.address().port}/api/processes/2/activities/2/attachments`, {
+    method: 'POST',
+    headers: authHeaders(admin.token),
+    body: form
+  });
+  
+  const uploadedFile = await uploadResponse.json();
+  
+  // NGE download setor B
+  const downloadResponse = await fetch(`http://127.0.0.1:${serverInstance.address().port}/api/processes/2/activities/2/attachments/${uploadedFile.id}/download`, {
+    headers: authHeaders(admin.token)
+  });
+  
+  assert.equal(downloadResponse.status, 200);
+  
+  // NGE delete setor B
+  const deleteResponse = await fetch(`http://127.0.0.1:${serverInstance.address().port}/api/processes/2/activities/2/attachments/${uploadedFile.id}`, {
+    method: 'DELETE',
+    headers: authHeaders(admin.token)
+  });
+  
+  assert.equal(deleteResponse.status, 200);
+  
+  // Verify deleted via list
+  const listResponse = await fetch(`http://127.0.0.1:${serverInstance.address().port}/api/processes/2/activities/2/attachments`, {
+    headers: authHeaders(admin.token)
+  });
+  
+  const listData = await listResponse.json();
+  const attachmentsList = listData.attachments || listData;
+  const deleted = attachmentsList.find(a => a.id === uploadedFile.id);
+  assert.ok(!deleted, 'Arquivo excluído não deve aparecer na lista');
+});

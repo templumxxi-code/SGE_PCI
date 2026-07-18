@@ -114,12 +114,16 @@ CREATE TABLE anexos (
     atividade_id INT REFERENCES atividades(id) ON DELETE CASCADE,
     tipo VARCHAR(50) NOT NULL CHECK (tipo IN ('POP', 'PAP', 'BPMN', 'Outro')),
     nome_arquivo VARCHAR(255) NOT NULL,
+    nome_armazenado TEXT NOT NULL,
     caminho_arquivo TEXT NOT NULL,
+    hash_sha256 VARCHAR(64) NOT NULL,
     tamanho_bytes INT,
     mime_type VARCHAR(100),
     enviado_por INT NOT NULL REFERENCES usuarios(id),
     descricao TEXT,
-    data_envio TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    data_envio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    excluido_em TIMESTAMP,
+    excluido_por INT REFERENCES usuarios(id)
 );
 
 -- Tabela de Logs de Ações (Auditoria)

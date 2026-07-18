@@ -47,8 +47,11 @@ const buildRealPoolConfig = () => {
 
 const seedTestData = async (pool) => {
     await pool.query('DELETE FROM logs;');
+    await pool.query('DELETE FROM anexos;');
     await pool.query('DELETE FROM historico_processos;');
     await pool.query('DELETE FROM indicadores;');
+    await pool.query('DELETE FROM atividades;');
+    await pool.query('DELETE FROM subprocessos;');
     await pool.query('DELETE FROM processos;');
     await pool.query('DELETE FROM usuarios;');
     await pool.query('DELETE FROM macroprocessos;');
@@ -67,6 +70,8 @@ const seedTestData = async (pool) => {
     `, [adminHash, setorHash]);
 
     await pool.query(`INSERT INTO processos (id, nome, setor_id, macroprocesso_id, status_fase, percentual_conclusao, observacoes) VALUES (1, 'Processo A', 1, 1, 'Planejar', 20, 'Processo do setor A'), (2, 'Processo B', 2, 1, 'Implementar', 45, 'Processo do setor B');`);
+    await pool.query(`INSERT INTO subprocessos (id, processo_id, nome, descricao, status_fase, ordem) VALUES (1, 1, 'Subprocesso A', 'Subprocesso do processo A', 'Planejar', 1), (2, 2, 'Subprocesso B', 'Subprocesso do processo B', 'Implementar', 1);`);
+    await pool.query(`INSERT INTO atividades (id, subprocesso_id, nome, descricao, status, responsavel_id, data_inicio, data_vencimento, ordem) VALUES (1, 1, 'Atividade A', 'Atividade do processo A', 'Pendente', 2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '7 days', 1), (2, 2, 'Atividade B', 'Atividade do processo B', 'Pendente', 2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '7 days', 1);`);
     await pool.query(`INSERT INTO indicadores (id, processo_id, nome, descricao, valor_meta, valor_atual, tipo_indicador, periodicidade) VALUES (1, 1, 'Indicador A', 'Indicador do processo A', 100, 20, NULL, NULL), (2, 2, 'Indicador B', 'Indicador do processo B', 100, 45, NULL, NULL);`);
 };
 
@@ -149,6 +154,50 @@ const createTestPool = async () => {
         );
     `);
     await pool.query(`
+        CREATE TABLE subprocessos (
+            id SERIAL PRIMARY KEY,
+            processo_id INT NOT NULL REFERENCES processos(id) ON DELETE CASCADE,
+            nome VARCHAR(150) NOT NULL,
+            descricao TEXT,
+            status_fase VARCHAR(50) DEFAULT 'Planejar',
+            ordem INT,
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    `);
+    await pool.query(`
+        CREATE TABLE atividades (
+            id SERIAL PRIMARY KEY,
+            subprocesso_id INT NOT NULL REFERENCES subprocessos(id) ON DELETE CASCADE,
+            nome VARCHAR(150) NOT NULL,
+            descricao TEXT,
+            status VARCHAR(50) DEFAULT 'Pendente',
+            responsavel_id INT REFERENCES usuarios(id),
+            data_inicio TIMESTAMP,
+            data_vencimento TIMESTAMP,
+            ordem INT,
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    `);
+    await pool.query(`
+        CREATE TABLE anexos (
+            id SERIAL PRIMARY KEY,
+            processo_id INT REFERENCES processos(id) ON DELETE CASCADE,
+            atividade_id INT REFERENCES atividades(id) ON DELETE CASCADE,
+            tipo VARCHAR(50) NOT NULL,
+            nome_arquivo VARCHAR(255) NOT NULL,
+            nome_armazenado TEXT NOT NULL,
+            caminho_arquivo TEXT NOT NULL,
+            hash_sha256 VARCHAR(64) NOT NULL,
+            tamanho_bytes INT,
+            mime_type VARCHAR(100),
+            enviado_por INT NOT NULL REFERENCES usuarios(id),
+            descricao TEXT,
+            data_envio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            excluido_em TIMESTAMP,
+            excluido_por INT REFERENCES usuarios(id)
+        );
+    `);
+    await pool.query(`
         CREATE TABLE logs (
             id SERIAL PRIMARY KEY,
             usuario_id INT NOT NULL REFERENCES usuarios(id),
@@ -215,6 +264,8 @@ const resetTestDatabase = async () => {
         `, [adminHash, setorHash]);
 
         await pool.query(`INSERT INTO processos (id, nome, setor_id, macroprocesso_id, status_fase, percentual_conclusao, observacoes) VALUES (1, 'Processo A', 1, 1, 'Planejar', 20, 'Processo do setor A'), (2, 'Processo B', 2, 1, 'Implementar', 45, 'Processo do setor B');`);
+        await pool.query(`INSERT INTO subprocessos (id, processo_id, nome, descricao, status_fase, ordem) VALUES (1, 1, 'Subprocesso A', 'Subprocesso do processo A', 'Planejar', 1), (2, 2, 'Subprocesso B', 'Subprocesso do processo B', 'Implementar', 1);`);
+        await pool.query(`INSERT INTO atividades (id, subprocesso_id, nome, descricao, status, responsavel_id, data_inicio, data_vencimento, ordem) VALUES (1, 1, 'Atividade A', 'Atividade do processo A', 'Pendente', 2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '7 days', 1), (2, 2, 'Atividade B', 'Atividade do processo B', 'Pendente', 2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '7 days', 1);`);
         await pool.query(`INSERT INTO indicadores (id, processo_id, nome, descricao, valor_meta, valor_atual, valor_anterior, unidade_medida, tipo_indicador, periodicidade) VALUES (1, 1, 'Indicador A', 'Indicador do processo A', 100, 20, NULL, NULL, NULL, NULL), (2, 2, 'Indicador B', 'Indicador do processo B', 100, 45, NULL, NULL, NULL, NULL);`);
 
         const resetSequence = async (sequenceName, tableName) => {

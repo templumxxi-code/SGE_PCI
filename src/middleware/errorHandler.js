@@ -41,7 +41,7 @@ const errorHandler = (err, req, res, next) => {
         statusCode = 400;
         errorType = 'INVALID_REFERENCE';
         message = 'Referência inválida em relacionamento';
-    } else if (err.name === 'ValidationError') {
+    } else if (err.name === 'ValidationError' && !err.statusCode) {
         statusCode = 400;
         errorType = 'VALIDATION_ERROR';
     } else if (err.name === 'UnauthorizedError') {

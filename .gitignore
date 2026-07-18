@@ -19,6 +19,8 @@ yarn-error.log*
 dist/
 build/
 uploads/
+storage/attachments/
+storage/tmp/
 database.db
 *.sqlite
 .env.production

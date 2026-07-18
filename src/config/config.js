@@ -33,6 +33,12 @@ module.exports = {
         directory: process.env.UPLOAD_DIR || './uploads'
     },
 
+    // Attachment storage
+    attachment: {
+        maxSize: process.env.MAX_FILE_SIZE || 10485760, // 10MB
+        directory: process.env.ATTACHMENT_STORAGE_DIR || './storage/attachments'
+    },
+
     // CORS
     cors: {
         origin: process.env.NODE_ENV === 'production' 

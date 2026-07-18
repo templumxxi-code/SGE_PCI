@@ -108,11 +108,13 @@ const configureApiRoutes = async () => {
         const processRoutes = require('./routes/processes');
         const indicatorRoutes = require('./routes/indicators');
         const reportRoutes = require('./routes/reports');
+        const attachmentRoutes = require('./routes/attachments');
 
         app.use('/api/auth', authRoutes);
         app.use('/api/processes', processRoutes);
         app.use('/api/indicators', indicatorRoutes);
         app.use('/api/reports', reportRoutes);
+        app.use('/api', attachmentRoutes);
     }
 
     routesConfigured = true;
