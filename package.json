@@ -8,7 +8,8 @@
     "dev": "nodemon src/server.js",
     "test": "node --test test/functional/*.test.js",
     "test:roles": "node test/functional/role-access.test.js",
-    "test:security": "node --test test/functional/security-auth.test.js"
+    "test:security": "node --test test/functional/security-auth.test.js",
+    "test:integration": "node --test test/functional/postgresql-integration.test.js"
   },
   "engines": {
     "node": ">=18.0.0"

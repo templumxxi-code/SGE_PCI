@@ -9,6 +9,42 @@ require('dotenv').config();
 let activePool = null;
 let initializationPromise = null;
 
+const isIntegrationTestDatabase = () => {
+    const databaseName = (process.env.DB_NAME || '').toLowerCase();
+    return Boolean(process.env.TEST_DATABASE_URL) || process.env.USE_REAL_PG === 'true' || databaseName.includes('test') || databaseName.includes('teste');
+};
+
+const buildRealPoolConfig = () => {
+    if (process.env.TEST_DATABASE_URL) {
+        try {
+            const parsedUrl = new URL(process.env.TEST_DATABASE_URL);
+            return {
+                host: parsedUrl.hostname || '127.0.0.1',
+                port: Number(parsedUrl.port || 5432),
+                database: parsedUrl.pathname.replace(/^\/+/, '') || 'smp_pci_test',
+                user: decodeURIComponent(parsedUrl.username) || process.env.DB_USER || 'postgres',
+                password: decodeURIComponent(parsedUrl.password) || process.env.DB_PASSWORD || '',
+                max: 20,
+                idleTimeoutMillis: 30000,
+                connectionTimeoutMillis: 5000,
+            };
+        } catch (error) {
+            console.warn('TEST_DATABASE_URL inválida, usando DB_*:', error.message);
+        }
+    }
+
+    return {
+        host: process.env.DB_HOST || '127.0.0.1',
+        port: Number(process.env.DB_PORT || 5432),
+        database: process.env.DB_NAME || 'smp_pci',
+        user: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD || '',
+        max: 20,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 5000,
+    };
+};
+
 const seedTestData = async (pool) => {
     await pool.query('DELETE FROM logs;');
     await pool.query('DELETE FROM historico_processos;');
@@ -31,7 +67,7 @@ const seedTestData = async (pool) => {
     `, [adminHash, setorHash]);
 
     await pool.query(`INSERT INTO processos (id, nome, setor_id, macroprocesso_id, status_fase, percentual_conclusao, observacoes) VALUES (1, 'Processo A', 1, 1, 'Planejar', 20, 'Processo do setor A'), (2, 'Processo B', 2, 1, 'Implementar', 45, 'Processo do setor B');`);
-    await pool.query(`INSERT INTO indicadores (id, processo_id, nome, descricao, valor_meta, valor_atual, tipo_indicador, periodicidade) VALUES (1, 1, 'Indicador A', 'Indicador do processo A', 100, 20, 'Eficiência', 'Mensal'), (2, 2, 'Indicador B', 'Indicador do processo B', 100, 45, 'Eficiência', 'Mensal');`);
+    await pool.query(`INSERT INTO indicadores (id, processo_id, nome, descricao, valor_meta, valor_atual, tipo_indicador, periodicidade) VALUES (1, 1, 'Indicador A', 'Indicador do processo A', 100, 20, NULL, NULL), (2, 2, 'Indicador B', 'Indicador do processo B', 100, 45, NULL, NULL);`);
 };
 
 const createTestPool = async () => {
@@ -143,12 +179,127 @@ const createTestPool = async () => {
 };
 
 const resetTestDatabase = async () => {
-    if (process.env.NODE_ENV !== 'test' && process.env.USE_PG_MEM !== 'true') {
+    const shouldReset = process.env.NODE_ENV === 'test' || process.env.USE_PG_MEM === 'true' || process.env.USE_REAL_PG === 'true';
+    if (!shouldReset) {
         return;
     }
 
     const pool = await initializePool();
+    const isPgMem = process.env.USE_PG_MEM === 'true';
+    const isRealDatabase = !isPgMem && (process.env.USE_REAL_PG === 'true' || isIntegrationTestDatabase());
+
+    if (isRealDatabase) {
+        if (process.env.NODE_ENV !== 'test' || !isIntegrationTestDatabase()) {
+            throw new Error('resetTestDatabase: refusing to reset a non-test real database');
+        }
+
+        try {
+            await pool.query(
+                'TRUNCATE TABLE logs, anexos, alertas, historico_processos, tarefas, atividades, subprocessos, indicadores, processos, usuarios, macroprocessos, setores RESTART IDENTITY CASCADE;'
+            );
+        } catch (e) {
+            console.error('Falha ao truncar tabelas de teste:', e.message);
+            throw e;
+        }
+
+        await pool.query(`INSERT INTO setores (id, nome, descricao) VALUES (1, 'Setor A', 'Setor de teste A'), (2, 'Setor B', 'Setor de teste B');`);
+        await pool.query(`INSERT INTO macroprocessos (id, nome, descricao) VALUES (1, 'Macroprocesso Teste', 'Macroprocesso de teste');`);
+
+        const adminHash = await bcryptjs.hash('admin123', 12);
+        const setorHash = await bcryptjs.hash('setor123', 12);
+        await pool.query(`
+            INSERT INTO usuarios (id, nome, email, senha_hash, perfil, setor_id, ativo)
+            VALUES
+                (1, 'Admin', 'admin@pci.rn.gov.br', $1, 'NGE', NULL, TRUE),
+                (2, 'Setor', 'setor@pci.rn.gov.br', $2, 'SETOR', 1, TRUE);
+        `, [adminHash, setorHash]);
+
+        await pool.query(`INSERT INTO processos (id, nome, setor_id, macroprocesso_id, status_fase, percentual_conclusao, observacoes) VALUES (1, 'Processo A', 1, 1, 'Planejar', 20, 'Processo do setor A'), (2, 'Processo B', 2, 1, 'Implementar', 45, 'Processo do setor B');`);
+        await pool.query(`INSERT INTO indicadores (id, processo_id, nome, descricao, valor_meta, valor_atual, valor_anterior, unidade_medida, tipo_indicador, periodicidade) VALUES (1, 1, 'Indicador A', 'Indicador do processo A', 100, 20, NULL, NULL, NULL, NULL), (2, 2, 'Indicador B', 'Indicador do processo B', 100, 45, NULL, NULL, NULL, NULL);`);
+
+        const resetSequence = async (sequenceName, tableName) => {
+            try {
+                const { rows } = await pool.query(`SELECT COALESCE(MAX(id), 0) AS max_id FROM ${tableName};`);
+                const maxId = Number(rows[0]?.max_id || 0);
+                if (maxId === 0) {
+                    await pool.query(`SELECT setval('${sequenceName}', 1, false);`);
+                } else {
+                    await pool.query(`SELECT setval('${sequenceName}', $1, true);`, [maxId]);
+                }
+            } catch (e) {
+                console.error(`Falha ao ajustar sequência ${sequenceName}:`, e.message);
+            }
+        };
+
+        await resetSequence('setores_id_seq', 'setores');
+        await resetSequence('macroprocessos_id_seq', 'macroprocessos');
+        await resetSequence('usuarios_id_seq', 'usuarios');
+        await resetSequence('processos_id_seq', 'processos');
+        await resetSequence('indicadores_id_seq', 'indicadores');
+        await resetSequence('logs_id_seq', 'logs');
+
+        return;
+    }
+
+    const tableExists = async (tableName) => {
+        const result = await pool.query(
+            `SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1 LIMIT 1;`,
+            [tableName]
+        );
+        return result.rowCount > 0;
+    };
+
+    const deleteIfExists = async (tableName) => {
+        if (await tableExists(tableName)) {
+            await pool.query(`DELETE FROM ${tableName};`);
+        }
+    };
+
+    const orderedTables = [
+        'logs',
+        'anexos',
+        'alertas',
+        'historico_processos',
+        'tarefas',
+        'atividades',
+        'subprocessos',
+        'indicadores',
+        'processos',
+        'usuarios',
+        'macroprocessos',
+        'setores'
+    ];
+
+    for (const tableName of orderedTables) {
+        await deleteIfExists(tableName);
+    }
+
     await seedTestData(pool);
+
+    const resetSequence = async (sequenceName, tableName) => {
+        if (isPgMem) {
+            return;
+        }
+
+        try {
+            const { rows } = await pool.query(`SELECT COALESCE(MAX(id), 0) AS max_id FROM ${tableName};`);
+            const maxId = Number(rows[0]?.max_id || 0);
+            if (maxId === 0) {
+                await pool.query(`SELECT setval('${sequenceName}', 1, false);`);
+            } else {
+                await pool.query(`SELECT setval('${sequenceName}', $1, true);`, [maxId]);
+            }
+        } catch (e) {
+            console.error(`Falha ao ajustar sequência ${sequenceName}:`, e.message);
+        }
+    };
+
+    await resetSequence('setores_id_seq', 'setores');
+    await resetSequence('macroprocessos_id_seq', 'macroprocessos');
+    await resetSequence('usuarios_id_seq', 'usuarios');
+    await resetSequence('processos_id_seq', 'processos');
+    await resetSequence('indicadores_id_seq', 'indicadores');
+    await resetSequence('logs_id_seq', 'logs');
 };
 
 const initializePool = async () => {
@@ -158,20 +309,19 @@ const initializePool = async () => {
 
     if (!initializationPromise) {
         initializationPromise = (async () => {
-            if (process.env.NODE_ENV === 'test' || process.env.USE_PG_MEM === 'true') {
+            if (process.env.USE_PG_MEM === 'true') {
+                activePool = await createTestPool();
+            } else if (process.env.USE_REAL_PG === 'true' || isIntegrationTestDatabase()) {
+                const { Pool: PgPool } = require('pg');
+                activePool = new PgPool(buildRealPoolConfig());
+                activePool.on('error', (err) => {
+                    console.error('Erro na conexão com PostgreSQL:', err);
+                });
+            } else if (process.env.NODE_ENV === 'test') {
                 activePool = await createTestPool();
             } else {
                 const { Pool: PgPool } = require('pg');
-                activePool = new PgPool({
-                    host: process.env.DB_HOST || 'localhost',
-                    port: Number(process.env.DB_PORT || 5432),
-                    database: process.env.DB_NAME || 'smp_pci',
-                    user: process.env.DB_USER || 'postgres',
-                    password: process.env.DB_PASSWORD || 'postgres',
-                    max: 20,
-                    idleTimeoutMillis: 30000,
-                    connectionTimeoutMillis: 2000,
-                });
+                activePool = new PgPool(buildRealPoolConfig());
                 activePool.on('error', (err) => {
                     console.error('Erro na conexão com PostgreSQL:', err);
                 });
