@@ -1,0 +1,175 @@
+/* ============================================================================
+   SMP PCI - Dark Mode / Modo Escuro
+   Variáveis CSS para tema escuro
+   ============================================================================ */
+
+/* Modo Escuro - Ativado quando data-theme="dark" */
+html[data-theme="dark"] {
+    /* Cores Primárias - Modo Escuro */
+    --color-primary-dark: #0a2e66;      /* Azul escuro mais claro */
+    --color-primary: #1e5ba8;           /* Azul */
+    --color-primary-light: #2575d0;     /* Azul claro */
+    --color-accent: #ffc107;            /* Dourado (mantido) */
+    --color-success: #4caf50;           /* Verde mais claro */
+    --color-danger: #f44336;            /* Vermelho mais claro */
+    --color-warning: #ff9800;           /* Laranja */
+    --color-info: #29b6f6;              /* Ciano mais claro */
+    
+    /* Escala de Cinza - Modo Escuro */
+    --color-bg: #1a1a1a;               /* Fundo escuro */
+    --color-bg-secondary: #2d2d2d;     /* Fundo secundário */
+    --color-text: #e8e8e8;             /* Texto claro */
+    --color-text-secondary: #a0a0a0;   /* Texto secundário */
+    --color-border: #404040;           /* Borda */
+    --color-white: #252525;            /* Branco (mais escuro) */
+}
+
+/* Estilos específicos para modo escuro */
+html[data-theme="dark"] body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+}
+
+html[data-theme="dark"] .header,
+html[data-theme="dark"] .navbar,
+html[data-theme="dark"] .sidebar {
+    background-color: var(--color-white);
+    border-color: var(--color-border);
+}
+
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .panel,
+html[data-theme="dark"] .modal,
+html[data-theme="dark"] .dropdown-menu {
+    background-color: var(--color-white);
+    color: var(--color-text);
+    border-color: var(--color-border);
+}
+
+html[data-theme="dark"] input,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] select {
+    background-color: var(--color-bg-secondary);
+    color: var(--color-text);
+    border-color: var(--color-border);
+}
+
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder {
+    color: var(--color-text-secondary);
+}
+
+html[data-theme="dark"] .btn-secondary {
+    background-color: var(--color-bg-secondary);
+    color: var(--color-text);
+    border-color: var(--color-border);
+}
+
+html[data-theme="dark"] .btn-secondary:hover {
+    background-color: var(--color-border);
+}
+
+html[data-theme="dark"] table {
+    background-color: var(--color-white);
+    color: var(--color-text);
+}
+
+html[data-theme="dark"] thead {
+    background-color: var(--color-bg-secondary);
+}
+
+html[data-theme="dark"] tbody tr:hover {
+    background-color: var(--color-bg-secondary);
+}
+
+html[data-theme="dark"] .dashboard-card {
+    background-color: var(--color-white);
+    border-color: var(--color-border);
+}
+
+html[data-theme="dark"] .sidebar-item {
+    color: var(--color-text);
+    border-color: var(--color-border);
+}
+
+html[data-theme="dark"] .sidebar-item:hover {
+    background-color: var(--color-bg-secondary);
+}
+
+html[data-theme="dark"] .sidebar-item.active {
+    background-color: var(--color-primary);
+    color: var(--color-white);
+}
+
+html[data-theme="dark"] .badge {
+    background-color: var(--color-primary);
+}
+
+html[data-theme="dark"] .alert {
+    border-color: var(--color-border);
+}
+
+html[data-theme="dark"] .form-check input {
+    border-color: var(--color-border);
+    background-color: var(--color-bg-secondary);
+}
+
+html[data-theme="dark"] .toggle-theme-btn {
+    color: var(--color-text);
+    background-color: transparent;
+    border: 1px solid var(--color-border);
+}
+
+html[data-theme="dark"] .toggle-theme-btn:hover {
+    background-color: var(--color-bg-secondary);
+    border-color: var(--color-primary);
+}
+
+/* Estilos para rolagem em modo escuro */
+html[data-theme="dark"] ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+html[data-theme="dark"] ::-webkit-scrollbar-track {
+    background: var(--color-bg-secondary);
+}
+
+html[data-theme="dark"] ::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 4px;
+}
+
+html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-primary);
+}
+
+/* Compatibilidade com elementos específicos */
+html[data-theme="dark"] .chart-container {
+    background-color: var(--color-white);
+}
+
+html[data-theme="dark"] .modal-backdrop {
+    background-color: rgba(0, 0, 0, 0.7);
+}
+
+html[data-theme="dark"] .dropdown-menu {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
+}
+
+html[data-theme="dark"] .navbar-dropdown {
+    background-color: var(--color-white);
+}
+
+html[data-theme="dark"] .text-muted {
+    color: var(--color-text-secondary) !important;
+}
+
+/* Transição suave ao mudar tema */
+html {
+    transition: background-color var(--transition-base), color var(--transition-base);
+}
+
+html[data-theme="dark"] {
+    transition: background-color var(--transition-base), color var(--transition-base);
+}

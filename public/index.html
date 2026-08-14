@@ -14,6 +14,8 @@
     <link rel="stylesheet" type="text/css" href="./css/dashboard.css">
     <link rel="stylesheet" type="text/css" href="./css/planejar.css">
     <link rel="stylesheet" type="text/css" href="./css/responsive.css">
+    <link rel="stylesheet" type="text/css" href="./css/dark-mode.css">
+    <link rel="stylesheet" type="text/css" href="./css/theme-button.css">
     
     <!-- Fonts -->
     <!-- Removido para evitar erros de DNS em ambiente offline -->
@@ -214,6 +216,10 @@
                             <i class="fas fa-search"></i>
                             <input id="process-search-header" type="text" placeholder="Buscar processos..." aria-label="Buscar processos">
                         </div>
+                        
+                        <button id="toggle-theme-btn" class="toggle-theme-btn" type="button" title="Alternar tema (Claro/Escuro)" aria-label="Alternar tema">
+                            <span>🌙</span>
+                        </button>
                         
                         <div class="user-menu">
                             <button class="btn-notification">
@@ -1065,5 +1071,6 @@
     <script src="./js/settings.js"></script>
     <script src="./js/bpm-details.js"></script>
     <script src="./js/app.js"></script>
+    <script src="./js/dark-mode.js"></script>
 </body>
 </html>

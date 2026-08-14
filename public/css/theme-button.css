@@ -1,0 +1,91 @@
+/* ============================================================================
+   SMP PCI - Botão Alternador de Tema
+   Estilos para o botão de alternância claro/escuro
+   ============================================================================ */
+
+/* Botão Alternador de Tema */
+.toggle-theme-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    margin: 0 var(--spacing-sm);
+    background-color: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    font-size: 20px;
+    transition: all var(--transition-base);
+    -webkit-appearance: none;
+    appearance: none;
+    color: var(--color-text);
+}
+
+.toggle-theme-btn:hover {
+    background-color: var(--color-bg-secondary);
+    border-color: var(--color-primary);
+    transform: scale(1.05);
+}
+
+.toggle-theme-btn:active {
+    transform: scale(0.95);
+}
+
+.toggle-theme-btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 61, 153, 0.1);
+}
+
+.toggle-theme-btn span {
+    display: inline-block;
+    font-size: 20px;
+    line-height: 1;
+    transition: transform var(--transition-base);
+}
+
+.toggle-theme-btn:hover span {
+    transform: rotate(20deg);
+}
+
+/* Posicionamento em diferentes layouts */
+.header-actions .toggle-theme-btn {
+    order: -1;
+    margin-right: var(--spacing-md);
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+    .toggle-theme-btn {
+        width: 36px;
+        height: 36px;
+        margin: 0 var(--spacing-xs);
+    }
+    
+    .toggle-theme-btn span {
+        font-size: 18px;
+    }
+}
+
+@media (max-width: 480px) {
+    .toggle-theme-btn {
+        width: 32px;
+        height: 32px;
+        margin: 0 2px;
+    }
+    
+    .toggle-theme-btn span {
+        font-size: 16px;
+    }
+}
+
+/* Animação de alternância */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.toggle-theme-btn.switching span {
+    animation: spin 0.5s ease-in-out;
+}
