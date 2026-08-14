@@ -181,7 +181,7 @@ const atividades = [
     { id: 3, processo_id: 1, fase: 'Analisar', descricao: 'Amplificação e análise eletroferograma', concluido: false, responsavel_id: 2, criado_em: '2026-05-05T11:00:00Z' },
     // Atividades para processo 2 (Planejar o Processo)
     { id: 4, processo_id: 2, fase: 'Planejar', descricao: 'Estabelecer objetivo do Projeto de Melhoria', concluido: true, responsavel_id: 1, criado_em: '2026-04-16T08:00:00Z', attachments: [{ id: 1, filename: 'Diagnóstico situacional.pdf', url: null, criado_em: '2026-04-16T08:05:00Z', usuario_id: 1 }], checklist: [{ id: 1, descricao: 'Definir objetivo do projeto de melhoria', concluido: true }, { id: 2, descricao: 'Realizar diagnóstico situacional e análise SWOT', concluido: true }, { id: 3, descricao: 'Registrar escopo inicial e contexto do processo', concluido: true }] },
-    { id: 5, processo_id: 2, fase: 'Planejar', descricao: 'Definir equipe de melhoria e responsabilidades (Matriz Raci)', concluido: true, responsavel_id: 1, criado_em: '2026-04-16T10:00:00Z', attachments: [{ id: 2, filename: 'Matriz Raci.xlsx', url: null, criado_em: '2026-04-16T10:05:00Z', usuario_id: 1 }], checklist: [{ id: 4, descricao: 'Identificar participantes do projeto', concluido: true }, { id: 5, descricao: 'Definir papéis e responsabilidades na Matriz RACI', concluido: true }] },
+    { id: 5, processo_id: 2, fase: 'Planejar', descricao: 'Definir equipe de melhoria', concluido: true, responsavel_id: 1, criado_em: '2026-04-16T10:00:00Z', attachments: [{ id: 2, filename: 'Lista_Equipe.xlsx', url: null, criado_em: '2026-04-16T10:05:00Z', usuario_id: 1 }], checklist: [{ id: 4, descricao: 'Identificar participantes do projeto', concluido: true }, { id: 5, descricao: 'Definir papéis e responsabilidades', concluido: true }] },
     { id: 6, processo_id: 2, fase: 'Planejar', descricao: 'Solicitar documentação existente do processo via SEI', concluido: true, responsavel_id: 1, criado_em: '2026-04-17T09:00:00Z', attachments: [{ id: 3, filename: 'Documentação_ATUAL_SEI.zip', url: null, criado_em: '2026-04-17T09:10:00Z', usuario_id: 1 }], checklist: [{ id: 6, descricao: 'Solicitar procedimentos operacionais', concluido: true }, { id: 7, descricao: 'Reunir normas institucionais e documentos AS-IS', concluido: true }] },
     { id: 7, processo_id: 2, fase: 'Planejar', descricao: 'Criar Diagrama de Escopo e Interface (DEIP) da situação atual', concluido: false, responsavel_id: 1, criado_em: '2026-04-18T14:00:00Z', attachments: [{ id: 4, filename: 'DEIP_Atual.pdf', url: null, criado_em: '2026-04-18T14:10:00Z', usuario_id: 1 }], checklist: [{ id: 8, descricao: 'Mapear fluxos atuais de processo', concluido: false }, { id: 9, descricao: 'Identificar interfaces entre áreas', concluido: false }] },
     { id: 8, processo_id: 2, fase: 'Planejar', descricao: 'Definir escopo do projeto de melhoria, restrições, premissas e metas', concluido: false, responsavel_id: 1, criado_em: '2026-04-19T11:00:00Z', attachments: [{ id: 5, filename: 'Escopo_Premissas_Metas.docx', url: null, criado_em: '2026-04-19T11:05:00Z', usuario_id: 1 }], checklist: [{ id: 10, descricao: 'Identificar restrições do projeto', concluido: false }, { id: 11, descricao: 'Definir premissas e metas da melhoria', concluido: false }] },
@@ -195,9 +195,160 @@ const atividades = [
     { id: 15, processo_id: 2, fase: 'Analisar', descricao: 'Priorizar desconexões e oportunidades de melhoria (Matriz GUT)', concluido: false, responsavel_id: 1, criado_em: '2026-04-26T09:00:00Z', attachments: [{ id: 14, filename: 'Plano_Prioridade_Melhorias.xlsx', url: null, criado_em: '2026-04-26T09:10:00Z', usuario_id: 1 }, { id: 15, filename: 'Matriz_GUT.pdf', url: null, criado_em: '2026-04-26T09:10:00Z', usuario_id: 1 }], checklist: [{ id: 27, descricao: 'Aplicar Matriz GUT nas oportunidades identificadas', concluido: false }, { id: 28, descricao: 'Ranquear melhorias por importância e impacto', concluido: false }, { id: 29, descricao: 'Definir plano de prioridade das ações', concluido: false }] },
     { id: 16, processo_id: 2, fase: 'Analisar', descricao: 'Análise de melhorias, priorização de causas e geração de ideias', concluido: false, responsavel_id: 1, criado_em: '2026-04-27T11:00:00Z', attachments: [{ id: 16, filename: 'Relatório_Análise_Causas_Ideias.docx', url: null, criado_em: '2026-04-27T11:10:00Z', usuario_id: 1 }, { id: 17, filename: 'Causas_Raíz_5Porquês.pdf', url: null, criado_em: '2026-04-27T11:10:00Z', usuario_id: 1 }], checklist: [{ id: 30, descricao: 'Aplicar técnica de análise de causas raiz (5 Porquês)', concluido: false }, { id: 31, descricao: 'Gerar ideias de soluções para cada causa', concluido: false }, { id: 32, descricao: 'Documentar análise e ideias no relatório', concluido: false }] },
     { id: 17, processo_id: 2, fase: 'Analisar', descricao: 'Levantar indicadores atuais dos processos (Ficha de Indicador)', concluido: false, responsavel_id: 1, criado_em: '2026-04-28T13:30:00Z', attachments: [{ id: 18, filename: 'Relatório_Indicadores_Atuais.pdf', url: null, criado_em: '2026-04-28T13:40:00Z', usuario_id: 1 }, { id: 19, filename: 'Anexo_V_Ficha_Indicadores.xlsx', url: null, criado_em: '2026-04-28T13:40:00Z', usuario_id: 1 }], checklist: [{ id: 33, descricao: 'Coletar dados dos indicadores atuais', concluido: false }, { id: 34, descricao: 'Preencher Ficha de Indicador (Anexo V)', concluido: false }, { id: 35, descricao: 'Consolidar relatório de indicadores', concluido: false }] },
-    // Atividades para processo 3
-    { id: 18, processo_id: 3, fase: 'Desenhar', descricao: 'Mapear etapas manuais existentes', concluido: false, responsavel_id: 2, criado_em: '2026-05-13T14:50:00Z' }
+    // As fases Desenhar, Implementar e Monitorar sao padronizadas abaixo para todos os processos.
 ];
+
+const atividadesPadraoFasesFinais = [
+    {
+        fase: 'Desenhar',
+        descricao: 'Redefinir escopo do processo, conforme modelo do Anexo I',
+        ferramenta: 'Análise de Escopo (DEIP revisado)',
+        produto: 'Escopo redefinido do processo, com limites claros, entradas, saídas, atores e objetivos alinhados à melhoria proposta',
+        anexo: 'Anexo_I_Escopo_DEIP_Revisado.pdf',
+        checklist: ['Revisar o escopo atual do processo', 'Definir limites, entradas, saídas e atores', 'Validar o escopo redefinido com os envolvidos']
+    },
+    {
+        fase: 'Desenhar',
+        descricao: 'Modelagem do processo otimizado: fluxo TO BE',
+        ferramenta: 'BPMN (Bizagi)',
+        produto: 'Diagrama TO-BE, representando o fluxo otimizado com as melhorias implementadas',
+        anexo: 'Fluxograma_TO-BE_Bizagi.bpmn',
+        checklist: ['Modelar o fluxo futuro em BPMN', 'Representar as melhorias no fluxo TO-BE', 'Validar o diagrama com os participantes']
+    },
+    {
+        fase: 'Desenhar',
+        descricao: 'Identificar as tarefas críticas do fluxo',
+        ferramenta: 'Anexo IV (Disfunções e Melhorias)',
+        produto: 'Lista de tarefas críticas, destacando etapas sensíveis que impactam diretamente o desempenho do processo',
+        anexo: 'Anexo_IV_Tarefas_Criticas.xlsx',
+        checklist: ['Listar as tarefas do fluxo otimizado', 'Classificar as tarefas críticas', 'Validar os impactos no desempenho']
+    },
+    {
+        fase: 'Desenhar',
+        descricao: 'Levantar riscos das tarefas críticas',
+        ferramenta: 'Anexo IV (Disfunções e Melhorias)',
+        produto: 'Matriz de riscos do processo, com identificação, classificação e ações de mitigação',
+        anexo: 'Matriz_Riscos_Tarefas_Criticas.xlsx',
+        checklist: ['Identificar riscos de cada tarefa crítica', 'Classificar probabilidade e impacto', 'Definir ações de mitigação e responsáveis']
+    },
+    {
+        fase: 'Desenhar',
+        descricao: 'Definir indicadores do processo',
+        ferramenta: 'Anexo IV (Disfunções e Melhorias)',
+        produto: 'Painel de indicadores do processo (KPIs), com métricas de eficiência, qualidade, tempo e custo',
+        anexo: 'Painel_Indicadores_KPIs.xlsx',
+        checklist: ['Definir indicadores de eficiência e qualidade', 'Estabelecer metas, periodicidade e responsáveis', 'Validar a ficha dos indicadores']
+    },
+    {
+        fase: 'Desenhar',
+        descricao: 'Documentação Descritiva do Processo (Guia do Processo)',
+        ferramenta: 'Anexo VI',
+        produto: 'Guia do Processo, contendo descrição detalhada das atividades, responsabilidades, regras e fluxos',
+        anexo: 'Anexo_VI_Guia_do_Processo.docx',
+        checklist: ['Descrever as atividades e responsabilidades', 'Registrar regras, entradas, saídas e fluxos', 'Revisar e aprovar o Guia do Processo']
+    },
+    {
+        fase: 'Desenhar',
+        descricao: 'Elaborar Plano de Implantação (Plano de Implementação) do processo otimizado',
+        ferramenta: 'Anexo VII',
+        produto: 'Plano de Implantação, com ações, responsáveis, prazos, recursos e etapas de execução',
+        anexo: 'Anexo_VII_Plano_de_Implantacao.xlsx',
+        checklist: ['Definir ações e etapas de implantação', 'Atribuir responsáveis e prazos', 'Dimensionar recursos e aprovar o plano']
+    },
+    {
+        fase: 'Desenhar',
+        descricao: 'Elaborar Plano de Capacitação (ação do Plano de Implementação)',
+        ferramenta: 'Anexo VII',
+        produto: 'Plano de Capacitação, contendo conteúdos, público-alvo, cronograma e métodos de treinamento',
+        anexo: 'Plano_de_Capacitacao.docx',
+        checklist: ['Identificar público-alvo e necessidades', 'Definir conteúdos e métodos de treinamento', 'Montar cronograma de capacitação']
+    },
+    {
+        fase: 'Implementar',
+        descricao: 'Acompanhar a execução das ações por meio das reuniões sistemáticas de acompanhamento',
+        ferramenta: 'Anexo VII',
+        produto: 'Relatórios de acompanhamento das ações',
+        anexo: 'Relatorio_Reunioes_Acompanhamento.docx',
+        checklist: ['Realizar reuniões sistemáticas de acompanhamento', 'Registrar decisões, pendências e responsáveis', 'Atualizar o andamento das ações']
+    },
+    {
+        fase: 'Implementar',
+        descricao: 'Acompanhar a implantação dos indicadores do processo e identificar contramedidas caso as metas não sejam atingidas',
+        ferramenta: 'Painel de indicadores (Power BI)',
+        produto: 'Dashboard de indicadores atualizado e desempenho do processo',
+        anexo: 'Dashboard_Indicadores_Implementacao.pbix',
+        checklist: ['Atualizar os dados dos indicadores', 'Comparar resultados com as metas', 'Registrar contramedidas para desvios']
+    },
+    {
+        fase: 'Monitorar',
+        descricao: 'Acompanhar a gestão do dia a dia do processo',
+        ferramenta: 'Checklists',
+        produto: 'Registros operacionais do processo',
+        anexo: 'Checklist_Gestao_Diaria.xlsx',
+        checklist: ['Registrar a execução das atividades', 'Conferir ocorrências e pendências', 'Atualizar os registros operacionais']
+    },
+    {
+        fase: 'Monitorar',
+        descricao: 'Acompanhar os resultados dos indicadores do processo',
+        ferramenta: 'Painéis de indicadores (Power BI)',
+        produto: 'Dashboard de indicadores atualizado e desempenho do processo',
+        anexo: 'Dashboard_Indicadores_Monitoramento.pbix',
+        checklist: ['Acompanhar os resultados periodicamente', 'Comparar desempenho com as metas', 'Registrar tendências e desvios']
+    },
+    {
+        fase: 'Monitorar',
+        descricao: 'Identificar oportunidades de melhorias',
+        ferramenta: 'Análise SWOT',
+        produto: 'Lista de oportunidades de melhorias',
+        anexo: 'Analise_SWOT_Oportunidades.xlsx',
+        checklist: ['Analisar forças, fraquezas, oportunidades e ameaças', 'Registrar oportunidades de melhoria', 'Priorizar oportunidades para o próximo ciclo']
+    },
+    {
+        fase: 'Monitorar',
+        descricao: 'Repassar periodicamente as informações de monitoramento às instâncias de governança estabelecidas no órgão',
+        ferramenta: 'Apresentações executivas (PowerPoint)',
+        produto: 'Tomada de decisão estratégica baseada em dados',
+        anexo: 'Apresentacao_Executiva_Monitoramento.pptx',
+        checklist: ['Consolidar informações de monitoramento', 'Preparar apresentação executiva', 'Registrar decisões e encaminhamentos da governança']
+    }
+];
+
+const adicionarAtividadesPadrao = () => {
+    let proximoId = Math.max(0, ...atividades.map(atividade => atividade.id)) + 1;
+    let proximoAnexoId = Math.max(0, ...atividades.flatMap(a => (a.attachments || []).map(anexo => anexo.id))) + 1;
+
+    processos.forEach((processo) => {
+        atividadesPadraoFasesFinais.forEach((modelo, indice) => {
+            const atividade = {
+                id: proximoId++,
+                processo_id: processo.id,
+                fase: modelo.fase,
+                descricao: modelo.descricao,
+                concluido: false,
+                responsavel_id: processo.responsavel_id || 1,
+                criado_em: new Date().toISOString(),
+                ferramenta: modelo.ferramenta,
+                produto: modelo.produto,
+                attachments: [{
+                    id: proximoAnexoId++,
+                    filename: modelo.anexo,
+                    url: null,
+                    criado_em: new Date().toISOString(),
+                    usuario_id: processo.responsavel_id || 1
+                }],
+                checklist: modelo.checklist.map((descricao, itemIndex) => ({
+                    id: itemIndex + 1,
+                    descricao,
+                    concluido: false
+                }))
+            };
+
+            atividades.push(atividade);
+        });
+    });
+};
+
+adicionarAtividadesPadrao();
 
 const generateId = (items) => Math.max(0, ...items.map(item => item.id)) + 1;
 

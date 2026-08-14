@@ -1,0 +1,25 @@
+[
+  {
+    "nome": "Usuário Novo",
+    "email": "novo-1786541507479@pci.rn.gov.br",
+    "senha": "senhateste123",
+    "perfil": "OPERACIONAL",
+    "name": "Usuário Novo",
+    "registration": null,
+    "role": "OPERACIONAL",
+    "organizationType": "SETOR",
+    "organizationUnitId": null,
+    "instituteId": null,
+    "regionalId": null,
+    "advisoryId": null,
+    "nucleusId": null,
+    "sectorId": null,
+    "setor_id": null,
+    "active": true,
+    "observations": "",
+    "createdAt": "2026-08-12T13:31:48.291Z",
+    "updatedAt": "2026-08-12T13:31:48.291Z",
+    "id": 1786541508941,
+    "passwordHash": "$2a$12$PaPYe8jHmUFQWGhcZah9nu5tM1GLY0V2YkrgilFgbkpffjuaxc3SW"
+  }
+]

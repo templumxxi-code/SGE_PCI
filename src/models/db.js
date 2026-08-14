@@ -4,6 +4,12 @@
 
 const bcryptjs = require('bcryptjs');
 const { Pool } = require('pg');
+let bootstrapTestDatabase;
+// bootstrap-test-db is heavy and must only be loaded in test initialization paths
+// to avoid modifying production startup behavior. Tests should call initializeTestDatabase().
+if (process.env.NODE_ENV === 'test' || process.env.USE_PG_MEM === 'true') {
+    bootstrapTestDatabase = require('./bootstrap-test-db').bootstrapTestDatabase;
+}
 require('dotenv').config();
 
 let activePool = null;
@@ -45,17 +51,26 @@ const buildRealPoolConfig = () => {
     };
 };
 
-const seedTestData = async (pool) => {
-    await pool.query('DELETE FROM logs;');
-    await pool.query('DELETE FROM anexos;');
-    await pool.query('DELETE FROM historico_processos;');
-    await pool.query('DELETE FROM indicadores;');
-    await pool.query('DELETE FROM atividades;');
-    await pool.query('DELETE FROM subprocessos;');
-    await pool.query('DELETE FROM processos;');
-    await pool.query('DELETE FROM usuarios;');
-    await pool.query('DELETE FROM macroprocessos;');
-    await pool.query('DELETE FROM setores;');
+const seedTestData = async (pool, isPgMem = false) => {
+    const resetTable = async (tableName) => {
+        if (isPgMem) {
+            await pool.query(`DELETE FROM ${tableName};`);
+            return;
+        }
+        await pool.query(`TRUNCATE TABLE ${tableName} RESTART IDENTITY CASCADE;`);
+    };
+
+    await resetTable('logs');
+    await resetTable('anexos');
+    await resetTable('historico_processos');
+    await resetTable('indicadores');
+    await resetTable('atividades');
+    await resetTable('subprocessos');
+    await resetTable('processos');
+    await resetTable('organizational_units');
+    await resetTable('usuarios');
+    await resetTable('macroprocessos');
+    await resetTable('setores');
 
     await pool.query(`INSERT INTO setores (id, nome, descricao) VALUES (1, 'Setor A', 'Setor de teste A'), (2, 'Setor B', 'Setor de teste B');`);
     await pool.query(`INSERT INTO macroprocessos (id, nome, descricao) VALUES (1, 'Macroprocesso Teste', 'Macroprocesso de teste');`);
@@ -134,6 +149,9 @@ const createTestPool = async () => {
             data_fim TIMESTAMP,
             responsavel_id INT REFERENCES usuarios(id),
             observacoes TEXT,
+            ativo BOOLEAN DEFAULT TRUE,
+            excluido_em TIMESTAMP,
+            excluido_por INT REFERENCES usuarios(id),
             criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
@@ -198,6 +216,28 @@ const createTestPool = async () => {
         );
     `);
     await pool.query(`
+        CREATE TABLE organizational_units (
+            id SERIAL PRIMARY KEY,
+            nome VARCHAR(150) NOT NULL,
+            sigla VARCHAR(50) NOT NULL UNIQUE,
+            tipo VARCHAR(50) NOT NULL CHECK (tipo IN ('DIRETORIA', 'NUCLEO', 'SETOR', 'ASSESSORIA', 'REGIONAL')),
+            unidade_superior_id INT REFERENCES organizational_units(id),
+            setor_legado_id INT UNIQUE REFERENCES setores(id),
+            ativo BOOLEAN DEFAULT TRUE,
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    `);
+    await pool.query(`
+        CREATE INDEX idx_organizational_units_unidade_superior ON organizational_units(unidade_superior_id);
+    `);
+    await pool.query(`
+        CREATE INDEX idx_organizational_units_tipo ON organizational_units(tipo);
+    `);
+    await pool.query(`
+        CREATE INDEX idx_organizational_units_ativo ON organizational_units(ativo);
+    `);
+    await pool.query(`
         CREATE TABLE logs (
             id SERIAL PRIMARY KEY,
             usuario_id INT NOT NULL REFERENCES usuarios(id),
@@ -223,7 +263,31 @@ const createTestPool = async () => {
         );
     `);
 
-    await seedTestData(pool);
+    await seedTestData(pool, true);
+
+    const resetAllSequences = async () => {
+        const sequenceTableMap = {
+            setores_id_seq: 'setores',
+            usuarios_id_seq: 'usuarios',
+            macroprocessos_id_seq: 'macroprocessos',
+            processos_id_seq: 'processos',
+            indicadores_id_seq: 'indicadores',
+            subprocessos_id_seq: 'subprocessos',
+            atividades_id_seq: 'atividades',
+            logs_id_seq: 'logs',
+            organizational_units_id_seq: 'organizational_units'
+        };
+
+        for (const [sequenceName, tableName] of Object.entries(sequenceTableMap)) {
+            try {
+                await pool.query(`SELECT setval('${sequenceName}', (SELECT COALESCE(MAX(id), 0) FROM ${tableName}), true);`);
+            } catch (e) {
+                // ignore missing sequences for tables not created in this environment
+            }
+        }
+    };
+
+    await resetAllSequences();
     return pool;
 };
 
@@ -237,14 +301,28 @@ const resetTestDatabase = async () => {
     const isPgMem = process.env.USE_PG_MEM === 'true';
     const isRealDatabase = !isPgMem && (process.env.USE_REAL_PG === 'true' || isIntegrationTestDatabase());
 
+    if (isPgMem) {
+        // For pg-mem, recreate the in-memory database to avoid self-referential
+        // foreign key issues and inconsistent truncate behavior.
+        global.__PG_MEM_DB = null;
+        global.__PG_MEM_POOL = null;
+        activePool = null;
+        initializationPromise = null;
+        await initializePool();
+        return;
+    }
+
     if (isRealDatabase) {
         if (process.env.NODE_ENV !== 'test' || !isIntegrationTestDatabase()) {
             throw new Error('resetTestDatabase: refusing to reset a non-test real database');
         }
 
         try {
+            await pool.query(`ALTER TABLE processos ADD COLUMN IF NOT EXISTS ativo BOOLEAN DEFAULT TRUE;`);
+            await pool.query(`ALTER TABLE processos ADD COLUMN IF NOT EXISTS excluido_em TIMESTAMP;`);
+            await pool.query(`ALTER TABLE processos ADD COLUMN IF NOT EXISTS excluido_por INT REFERENCES usuarios(id);`);
             await pool.query(
-                'TRUNCATE TABLE logs, anexos, alertas, historico_processos, tarefas, atividades, subprocessos, indicadores, processos, usuarios, macroprocessos, setores RESTART IDENTITY CASCADE;'
+                'TRUNCATE TABLE logs, anexos, alertas, historico_processos, tarefas, atividades, subprocessos, indicadores, processos, organizational_units, usuarios, macroprocessos, setores RESTART IDENTITY CASCADE;'
             );
         } catch (e) {
             console.error('Falha ao truncar tabelas de teste:', e.message);
@@ -286,6 +364,9 @@ const resetTestDatabase = async () => {
         await resetSequence('macroprocessos_id_seq', 'macroprocessos');
         await resetSequence('usuarios_id_seq', 'usuarios');
         await resetSequence('processos_id_seq', 'processos');
+        await resetSequence('subprocessos_id_seq', 'subprocessos');
+        await resetSequence('atividades_id_seq', 'atividades');
+        await resetSequence('organizational_units_id_seq', 'organizational_units');
         await resetSequence('indicadores_id_seq', 'indicadores');
         await resetSequence('logs_id_seq', 'logs');
 
@@ -302,7 +383,11 @@ const resetTestDatabase = async () => {
 
     const deleteIfExists = async (tableName) => {
         if (await tableExists(tableName)) {
-            await pool.query(`DELETE FROM ${tableName};`);
+            if (isPgMem) {
+                await pool.query(`DELETE FROM ${tableName};`);
+            } else {
+                await pool.query(`TRUNCATE TABLE ${tableName} RESTART IDENTITY CASCADE;`);
+            }
         }
     };
 
@@ -316,6 +401,7 @@ const resetTestDatabase = async () => {
         'subprocessos',
         'indicadores',
         'processos',
+        'organizational_units',
         'usuarios',
         'macroprocessos',
         'setores'
@@ -325,7 +411,7 @@ const resetTestDatabase = async () => {
         await deleteIfExists(tableName);
     }
 
-    await seedTestData(pool);
+    await seedTestData(pool, isPgMem);
 
     const resetSequence = async (sequenceName, tableName) => {
         if (isPgMem) {
@@ -368,6 +454,8 @@ const initializePool = async () => {
                 activePool.on('error', (err) => {
                     console.error('Erro na conexão com PostgreSQL:', err);
                 });
+                // IMPORTANT: Bootstrap is NOT called here. Tests must call initializeTestDatabase() explicitly.
+                // This prevents automatic schema modifications during normal application startup.
             } else if (process.env.NODE_ENV === 'test') {
                 activePool = await createTestPool();
             } else {
@@ -382,6 +470,45 @@ const initializePool = async () => {
     }
 
     return initializationPromise;
+};
+
+/**
+ * Initialize test database with bootstrap (schema and migrations)
+ * MUST be called explicitly by test files - never called automatically
+ * This provides strict isolation of database modifications to test phase only
+ */
+const initializeTestDatabase = async () => {
+    const pool = await initializePool();
+    if (!bootstrapTestDatabase) {
+        // Load dynamically if not already loaded (supports some test runners)
+        bootstrapTestDatabase = require('./bootstrap-test-db').bootstrapTestDatabase;
+    }
+    await bootstrapTestDatabase(pool);
+
+    const resetSequences = async () => {
+        const sequenceTableMap = {
+            setores_id_seq: 'setores',
+            usuarios_id_seq: 'usuarios',
+            macroprocessos_id_seq: 'macroprocessos',
+            processos_id_seq: 'processos',
+            indicadores_id_seq: 'indicadores',
+            subprocessos_id_seq: 'subprocessos',
+            atividades_id_seq: 'atividades',
+            logs_id_seq: 'logs',
+            organizational_units_id_seq: 'organizational_units'
+        };
+
+        for (const [sequenceName, tableName] of Object.entries(sequenceTableMap)) {
+            try {
+                await pool.query(`SELECT setval('${sequenceName}', (SELECT COALESCE(MAX(id), 0) FROM ${tableName}), true);`);
+            } catch (e) {
+                // ignore missing sequences for tables not created in this environment
+            }
+        }
+    };
+
+    await resetSequences();
+    return pool;
 };
 
 const poolProxy = {
@@ -488,5 +615,6 @@ module.exports = {
     beginTransaction,
     commit,
     rollback,
-    resetTestDatabase
+    resetTestDatabase,
+    initializeTestDatabase
 };

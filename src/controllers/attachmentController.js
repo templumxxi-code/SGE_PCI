@@ -185,6 +185,175 @@ const listAttachments = async (processId, activityId, user) => {
     return rows.map(getSafeAttachmentRow);
 };
 
+// -------------------- Process-level attachments (used by Planejar) --------------------
+const listProcessAttachments = async (processId, user) => {
+    // authorize by process only
+    const processo = await queryOne('SELECT id, setor_id FROM processos WHERE id = $1', [processId]);
+    if (!processo) throw createError('Processo não encontrado', 404, 'NotFoundError');
+
+    if (user.perfil === 'SETOR') {
+        const setorUsuario = user.setor_id;
+        if (!setorUsuario || processo.setor_id !== setorUsuario) {
+            throw createError('Acesso não autorizado ao processo', 403, 'ForbiddenError');
+        }
+    }
+
+    const rows = await queryMany(
+        `SELECT id, tipo, nome_arquivo, tamanho_bytes, mime_type, enviado_por, descricao, data_envio
+         FROM anexos
+         WHERE processo_id = $1 AND atividade_id IS NULL AND excluido_em IS NULL
+         ORDER BY data_envio DESC`,
+        [processId]
+    );
+
+    return rows.map(getSafeAttachmentRow);
+};
+
+const listProcessAttachmentsByType = async (processId, tipo, user) => {
+    const attachments = await listProcessAttachments(processId, user);
+    return attachments.filter((attachment) => String(attachment.tipo || '').toUpperCase() === String(tipo || '').toUpperCase());
+};
+
+const uploadProcessAttachment = async (req, processId, tipoLabel) => {
+    const { originalName, extension, expectedMime } = validateFileUpload(req);
+    const tipo = allowedAttachmentTypes.has(req.body.tipo) ? req.body.tipo : (tipoLabel || 'Outro');
+    const descricao = req.body.descricao ? String(req.body.descricao).trim().slice(0, 1000) : null;
+
+    // authorize by process
+    const processo = await queryOne('SELECT id, setor_id FROM processos WHERE id = $1', [processId]);
+    if (!processo) throw createError('Processo não encontrado', 404, 'NotFoundError');
+    if (req.user.perfil === 'SETOR') {
+        const setorUsuario = req.user.setor_id;
+        if (!setorUsuario || processo.setor_id !== setorUsuario) {
+            throw createError('Acesso não autorizado ao processo', 403, 'ForbiddenError');
+        }
+    }
+
+    const hashSha256 = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+
+    let storedName;
+    let client;
+    try {
+        storedName = await writeUniqueFile(req.file.buffer, extension);
+        client = await beginTransaction();
+
+        const result = await client.query(
+            `INSERT INTO anexos (processo_id, atividade_id, tipo, nome_arquivo, caminho_arquivo, nome_armazenado, tamanho_bytes, mime_type, hash_sha256, enviado_por, descricao, data_envio)
+             VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
+             RETURNING id, tipo, nome_arquivo, tamanho_bytes, mime_type, enviado_por, descricao, data_envio`,
+            [processId, tipo, originalName, storedName, storedName, req.file.size, expectedMime, hashSha256, req.user.id, descricao]
+        );
+
+        const attachment = result.rows[0];
+
+        await client.query(
+            `INSERT INTO logs (usuario_id, acao, tabela_afetada, id_registro, valores_novos, endereco_ip, user_agent)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [
+                req.user.id,
+                'UPLOAD_ANEXO_PROCESSO',
+                'anexos',
+                attachment.id,
+                JSON.stringify({ processo_id: Number(processId), mime_type: expectedMime, tamanho_bytes: req.file.size, hash_sha256: hashSha256, nome_armazenado: storedName, nome_arquivo: originalName }),
+                getRequestIp(req),
+                normalizeUserAgent(req.headers['user-agent'])
+            ]
+        );
+
+        await commit(client);
+        return attachment;
+    } catch (error) {
+        if (client) await rollback(client);
+        if (storedName) await fs.unlink(path.join(storageDir, storedName)).catch(() => {});
+        throw error;
+    }
+};
+
+const getProcessAttachmentForDownload = async (req, processId, attachmentId) => {
+    const processo = await queryOne('SELECT id, setor_id FROM processos WHERE id = $1', [processId]);
+    if (!processo) throw createError('Processo não encontrado', 404, 'NotFoundError');
+    if (req.user.perfil === 'SETOR') {
+        const setorUsuario = req.user.setor_id;
+        if (!setorUsuario || processo.setor_id !== setorUsuario) {
+            throw createError('Acesso não autorizado ao processo', 403, 'ForbiddenError');
+        }
+    }
+
+    const attachment = await queryOne(
+        `SELECT id, tipo, nome_arquivo, caminho_arquivo, tamanho_bytes, mime_type, enviado_por, descricao, data_envio
+         FROM anexos
+         WHERE id = $1 AND processo_id = $2 AND atividade_id IS NULL AND excluido_em IS NULL`,
+        [attachmentId, processId]
+    );
+
+    if (!attachment) throw createError('Anexo não encontrado', 404, 'NotFoundError');
+
+    const filePath = path.resolve(storageDir, attachment.caminho_arquivo);
+    await fs.access(filePath);
+
+    await query(
+        `INSERT INTO logs (usuario_id, acao, tabela_afetada, id_registro, valores_novos, endereco_ip, user_agent)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+            req.user.id,
+            'DOWNLOAD_ANEXO_PROCESSO',
+            'anexos',
+            attachment.id,
+            JSON.stringify({ processo_id: Number(processId), mime_type: attachment.mime_type, tamanho_bytes: attachment.tamanho_bytes, nome_arquivo: attachment.nome_arquivo }),
+            getRequestIp(req),
+            normalizeUserAgent(req.headers['user-agent'])
+        ]
+    );
+
+    return { attachment, filePath };
+};
+
+const deleteProcessAttachment = async (req, processId, attachmentId) => {
+    const processo = await queryOne('SELECT id, setor_id FROM processos WHERE id = $1', [processId]);
+    if (!processo) throw createError('Processo não encontrado', 404, 'NotFoundError');
+    if (req.user.perfil === 'SETOR') {
+        const setorUsuario = req.user.setor_id;
+        if (!setorUsuario || processo.setor_id !== setorUsuario) {
+            throw createError('Acesso não autorizado ao processo', 403, 'ForbiddenError');
+        }
+    }
+
+    const attachment = await queryOne(
+        `SELECT id FROM anexos WHERE id = $1 AND processo_id = $2 AND atividade_id IS NULL AND excluido_em IS NULL`,
+        [attachmentId, processId]
+    );
+
+    if (!attachment) throw createError('Anexo não encontrado', 404, 'NotFoundError');
+
+    const client = await beginTransaction();
+    try {
+        await client.query(
+            `UPDATE anexos SET excluido_em = CURRENT_TIMESTAMP, excluido_por = $1 WHERE id = $2`,
+            [req.user.id, attachmentId]
+        );
+
+        await client.query(
+            `INSERT INTO logs (usuario_id, acao, tabela_afetada, id_registro, valores_novos, endereco_ip, user_agent)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [
+                req.user.id,
+                'EXCLUSAO_ANEXO_PROCESSO',
+                'anexos',
+                attachmentId,
+                JSON.stringify({ processo_id: Number(processId) }),
+                getRequestIp(req),
+                normalizeUserAgent(req.headers['user-agent'])
+            ]
+        );
+
+        await commit(client);
+        return { mensagem: 'Anexo excluído com sucesso' };
+    } catch (error) {
+        await rollback(client);
+        throw error;
+    }
+};
+
 const uploadAttachment = async (req, processId, activityId) => {
     const { originalName, extension, expectedMime } = validateFileUpload(req);
     const tipo = allowedAttachmentTypes.has(req.body.tipo) ? req.body.tipo : 'Outro';
@@ -336,5 +505,10 @@ module.exports = {
     listAttachments,
     uploadAttachment,
     getAttachmentForDownload,
-    deleteAttachment
+    deleteAttachment,
+    listProcessAttachments,
+    listProcessAttachmentsByType,
+    uploadProcessAttachment,
+    getProcessAttachmentForDownload,
+    deleteProcessAttachment
 };

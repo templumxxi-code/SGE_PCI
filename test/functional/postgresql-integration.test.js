@@ -1,5 +1,6 @@
 process.env.NODE_ENV = 'test';
 process.env.USE_REAL_PG = 'true';
+process.env.ALLOW_TEST_DB_MIGRATIONS = 'true';
 process.env.RATE_LIMIT_MAX = '1000';
 process.env.DB_HOST = process.env.DB_HOST || '127.0.0.1';
 process.env.DB_PORT = process.env.DB_PORT || '5432';
@@ -9,10 +10,10 @@ process.env.DB_PASSWORD = process.env.DB_PASSWORD || '';
 process.env.JWT_SECRET = 'test-secret';
 process.env.JWT_EXPIRES_IN = '15m';
 
-const { test, beforeEach, afterEach } = require('node:test');
+const { test, beforeEach, afterEach, before } = require('node:test');
 const assert = require('node:assert/strict');
 const { startServer, resetLoginLimiter } = require('../../src/server');
-const { resetTestDatabase, query, queryOne } = require('../../src/models/db');
+const { resetTestDatabase, query, queryOne, initializeTestDatabase } = require('../../src/models/db');
 
 const startTestServer = async () => {
   const server = await startServer(0);
@@ -27,6 +28,22 @@ const stopTestServer = async (server) => {
 };
 
 let serverInstance = null;
+let testDatabaseInitialized = false;
+
+// Initialize test database once at the beginning (schema and migrations)
+before(async () => {
+  if (!testDatabaseInitialized) {
+    console.log('[PostgreSQL Integration Tests] Initializing test database...');
+    try {
+      await initializeTestDatabase();
+      testDatabaseInitialized = true;
+      console.log('[PostgreSQL Integration Tests] Test database initialized successfully');
+    } catch (error) {
+      console.error('[PostgreSQL Integration Tests] Failed to initialize test database:', error.message);
+      throw error;
+    }
+  }
+});
 
 beforeEach(async () => {
   resetLoginLimiter();
@@ -149,6 +166,29 @@ test('setor A não cria processo em outro setor pelo body', async () => {
   assert.equal(response.status, 201);
   const created = await response.json();
   assert.equal(created.id, 3);
+});
+
+test('criar processo garante template Planejar fixo e persistente', async () => {
+  const { body } = await loginAs('admin@pci.rn.gov.br', 'admin123');
+  const response = await fetch(`http://127.0.0.1:${serverInstance.address().port}/api/processes`, {
+    method: 'POST',
+    headers: { ...authHeaders(body.token), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nome: 'Processo Planejar Template', setor_id: 1, macroprocesso_id: 1 })
+  });
+
+  assert.equal(response.status, 201);
+  const created = await response.json();
+  assert.equal(typeof created.id, 'number');
+
+  const processResponse = await fetch(`http://127.0.0.1:${serverInstance.address().port}/api/processes/${created.id}`, { headers: authHeaders(body.token) });
+  assert.equal(processResponse.status, 200);
+  const processo = await processResponse.json();
+  assert.equal(processo.id, created.id);
+  assert.ok(Array.isArray(processo.atividades));
+  const expectedCodes = ['PLAN_A', 'PLAN_B', 'PLAN_C', 'PLAN_D', 'PLAN_E', 'PLAN_G'];
+  const actualCodes = processo.atividades.map((activity) => activity.codigo).sort();
+  assert.deepEqual(actualCodes, expectedCodes.sort());
+  assert.ok(processo.atividades.every((activity) => activity.fase === 'Planejar'));
 });
 
 test('setor A não amplia acesso com setorId na query string', async () => {

@@ -16,18 +16,47 @@ class ReportManager {
 
     static attachExportHandlers() {
         document.querySelectorAll('[data-report-action]').forEach(button => {
-            button.addEventListener('click', (event) => {
+            button.addEventListener('click', async (event) => {
+                event.preventDefault();
                 const action = event.currentTarget.dataset.reportAction;
-                switch (action) {
-                    case 'export-processos':
-                        this.exportProcessesReport();
-                        break;
-                    case 'export-indicadores':
-                        this.exportIndicatorsReport();
-                        break;
-                    case 'export-historico':
-                        this.exportHistoryReport();
-                        break;
+                const currentButton = event.currentTarget;
+                const originalText = currentButton.textContent;
+                
+                try {
+                    // Desabilitar botão durante o processo para PDF
+                    if (action.includes('pdf')) {
+                        currentButton.disabled = true;
+                        currentButton.textContent = '⏳ Gerando...';
+                    }
+                    
+                    switch (action) {
+                        case 'export-processos':
+                            await this.exportProcessesReport();
+                            break;
+                        case 'export-indicadores':
+                            await this.exportIndicatorsReport();
+                            break;
+                        case 'export-historico':
+                            await this.exportHistoryReport();
+                            break;
+                        case 'export-processos-pdf':
+                            await this.exportProcessesReportPDF();
+                            break;
+                        case 'export-indicadores-pdf':
+                            await this.exportIndicatorsReportPDF();
+                            break;
+                        case 'export-historico-pdf':
+                            await this.exportHistoryReportPDF();
+                            break;
+                    }
+                } catch (error) {
+                    console.error('Erro no handler de export:', error);
+                } finally {
+                    // Restaurar estado do botão
+                    if (action.includes('pdf')) {
+                        currentButton.disabled = false;
+                        currentButton.textContent = originalText;
+                    }
                 }
             });
         });
@@ -90,6 +119,138 @@ class ReportManager {
         } catch (error) {
             console.error('Erro ao exportar relatório:', error);
             alert('Não foi possível exportar o relatório de indicadores.');
+        }
+    }
+
+    /**
+     * Exportar relatório de processos em PDF
+     */
+    static async exportProcessesReportPDF(filtros = {}) {
+        try {
+            if (!filtros || Object.keys(filtros).length === 0) {
+                const card = document.querySelector('#relatorios .report-card');
+                const inputs = card.querySelectorAll('.report-filters input, .report-filters select');
+                const arr = Array.from(inputs);
+                if (arr.length >= 2 && arr[0].type === 'date' && arr[0].value) {
+                    filtros.data_inicio = arr[0].value;
+                    if (arr[1] && arr[1].type === 'date' && arr[1].value) {
+                        filtros.data_fim = arr[1].value;
+                    }
+                }
+                const select = card.querySelector('.report-filters select');
+                if (select && select.value && select.value !== 'Todos os setores') {
+                    filtros.setor_id = select.value;
+                }
+            }
+
+            const params = new URLSearchParams(filtros);
+            const url = `/api/reports/processos/pdf?${params}`;
+            await this.downloadPDF(url, 'relatorio_processos.pdf');
+        } catch (error) {
+            console.error('Erro ao exportar PDF de processos:', error);
+            alert('Não foi possível exportar o relatório de processos em PDF.');
+        }
+    }
+
+    /**
+     * Exportar relatório de indicadores em PDF
+     */
+    static async exportIndicatorsReportPDF(filtros = {}) {
+        try {
+            const card = document.querySelectorAll('#relatorios .report-card')[1];
+            const inputs = card.querySelectorAll('.report-filters input, .report-filters select');
+            const arr = Array.from(inputs);
+            
+            if (arr.length >= 1) {
+                const select = arr.find(el => el.tagName === 'SELECT');
+                if (select && select.value && select.value !== 'Todos os setores') {
+                    filtros.setor_id = select.value;
+                }
+                
+                const dates = arr.filter(el => el.type === 'date');
+                if (dates[0] && dates[0].value) {
+                    filtros.data_inicio = dates[0].value;
+                }
+                if (dates[1] && dates[1].value) {
+                    filtros.data_fim = dates[1].value;
+                }
+            }
+
+            const params = new URLSearchParams(filtros);
+            const url = `/api/reports/indicadores/pdf?${params}`;
+            await this.downloadPDF(url, 'relatorio_indicadores.pdf');
+        } catch (error) {
+            console.error('Erro ao exportar PDF de indicadores:', error);
+            alert('Não foi possível exportar o relatório de indicadores em PDF.');
+        }
+    }
+
+    /**
+     * Exportar histórico em PDF
+     */
+    static async exportHistoryReportPDF(filtros = {}) {
+        try {
+            const card = document.querySelectorAll('#relatorios .report-card')[2];
+            const inputs = card.querySelectorAll('.report-filters input');
+            const arr = Array.from(inputs);
+            
+            if (arr.length >= 1 && arr[0].value) {
+                filtros.data_inicio = arr[0].value;
+            }
+            if (arr.length >= 2 && arr[1].value) {
+                filtros.data_fim = arr[1].value;
+            }
+
+            const params = new URLSearchParams(filtros);
+            const url = `/api/reports/logs/pdf?${params}`;
+            await this.downloadPDF(url, 'relatorio_auditoria.pdf');
+        } catch (error) {
+            console.error('Erro ao exportar PDF de auditoria:', error);
+            alert('Não foi possível exportar o relatório de auditoria em PDF.');
+        }
+    }
+
+    /**
+     * Download de arquivo PDF
+     */
+    static async downloadPDF(url, filename) {
+        try {
+            const token = localStorage.getItem('smp_token');
+            if (!token) {
+                alert('Sessão expirada. Por favor, faça login novamente.');
+                return;
+            }
+
+            // Fazer requisição com Authorization header
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`Erro HTTP: ${response.status}`);
+            }
+
+            // Obter o blob do PDF
+            const blob = await response.blob();
+
+            // Criar um link temporário e fazer o download
+            const blobUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = filename;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            // Liberar a memória
+            window.URL.revokeObjectURL(blobUrl);
+        } catch (error) {
+            console.error('Erro ao fazer download do PDF:', error);
+            alert(`Erro ao fazer download do PDF: ${error.message}`);
         }
     }
 

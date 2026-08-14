@@ -83,6 +83,9 @@ test('fluxo funcional NGE e Setor com autorização real', async (t) => {
     assert.equal(sectorDashboard.status, 200);
     assert.equal(typeof sectorDashboard.data.processos.total, 'number');
     assert(sectorDashboard.data.processos.total <= adminDashboard.data.processos.total);
+    assert.equal(typeof sectorDashboard.data.atividades.concluidas, 'number');
+    assert.equal(typeof sectorDashboard.data.atividades.pendentes, 'number');
+    assert.equal(sectorDashboard.data.atividades.atrasadas, 0);
 
     const sectorReports = await get('/reports/processos?setor_id=2', sector.token, baseUrl);
     assert.equal(sectorReports.status, 200);

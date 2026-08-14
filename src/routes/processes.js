@@ -75,11 +75,28 @@ router.put('/:id', verifyToken, async (req, res, next) => {
 
 /**
  * DELETE /api/processes/:id
- * Deletar processo
+ * Deletar processo (requer confirmação de senha do usuário no corpo: { senha })
  */
-router.delete('/:id', verifyToken, requireAdmin, async (req, res, next) => {
+router.delete('/:id', verifyToken, async (req, res, next) => {
     try {
-        const resultado = await processController.deletarProcesso(req.params.id, req.user.id);
+        const { isGlobalAdmin } = require('../services/roles');
+        const senha = req.body && req.body.senha ? String(req.body.senha) : null;
+
+        // Administradores globais podem remover sem senha; demais usuários exigem confirmação
+        if (!isGlobalAdmin(req.user.perfil)) {
+            if (!senha) return res.status(400).json({ error: 'Senha é obrigatória para remoção' });
+
+            // Verificar senha do usuário atual contra o hash no banco
+            const bcryptjs = require('bcryptjs');
+            const { queryOne } = require('../models/db');
+            const userRow = await queryOne('SELECT password_hash FROM usuarios WHERE id = $1', [req.user.id]);
+            const hash = userRow ? userRow.password_hash || userRow.passwordHash || null : null;
+            const senhaValida = hash ? await bcryptjs.compare(String(senha), hash) : false;
+            if (!senhaValida) return res.status(403).json({ error: 'Senha inválida' });
+        }
+
+        const motivo = req.body && req.body.motivo ? String(req.body.motivo).slice(0, 1000) : null;
+        const resultado = await processController.deletarProcesso(req.params.id, req.user.id, req.user.perfil, motivo);
         res.json(resultado);
     } catch (error) {
         next(error);

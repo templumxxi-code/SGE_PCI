@@ -6,23 +6,25 @@
     <title>SMP PCI - Sistema de Monitoramento de Processos BPM</title>
     
     <!-- Favicon -->
-    <link rel="icon" type="image/x-icon" href="./assets/favicon.ico">
+    <link rel="icon" type="image/png" href="./assets/images/logo-sge-pci-removebg-preview.png">
     
     <!-- CSS -->
     <link rel="stylesheet" type="text/css" href="./css/style.css">
+    <link rel="stylesheet" type="text/css" href="./css/icons.css">
     <link rel="stylesheet" type="text/css" href="./css/dashboard.css">
+    <link rel="stylesheet" type="text/css" href="./css/planejar.css">
     <link rel="stylesheet" type="text/css" href="./css/responsive.css">
     
     <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <!-- Removido para evitar erros de DNS em ambiente offline -->
+    <!-- <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"> -->
     
     <!-- Icons (FontAwesome) -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Removido para evitar erros de DNS em ambiente offline -->
+    <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"> -->
     
-    <!-- Chart.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
 </head>
 <body>
     <!-- Container Principal -->
@@ -34,14 +36,21 @@
                 <div class="login-box">
                     <div class="login-header">
                         <div class="logo-container">
-                            <i class="fas fa-shield-alt logo-icon"></i>
+                            <img src="./assets/images/logo-sge-pci-removebg-preview.png" alt="SGE PCI/RN" class="login-logo">
                         </div>
-                        <h1>SMP PCI</h1>
-                        <p class="subtitle">Sistema de Monitoramento de Processos BPM</p>
+                        <h1>SGE PCI/RN</h1>
+                        <p class="subtitle">Sistema de Gestão Estratégica</p>
                         <p class="institution">Polícia Científica do Rio Grande do Norte</p>
                     </div>
 
                     <form id="login-form" class="login-form">
+                        <div class="form-group">
+                            <label for="login-profile-select">Acessar com</label>
+                            <select id="login-profile-select" class="login-select">
+                                <option value="admin">Admin SGE PCI/RN</option>
+                            </select>
+                        </div>
+
                         <div class="form-group">
                             <label for="email-input">E-mail</label>
                             <input 
@@ -67,12 +76,123 @@
                         </button>
                     </form>
 
+                    <div class="login-links">
+                        <button id="btn-forgot-password" type="button" class="btn-link">Esqueceu a senha?</button>
+                    </div>
+
                     <div class="login-footer">
                         <p class="dev-credentials">
-                            <strong>Credenciais de Teste:</strong><br>
-                            Admin: admin@pci.rn.gov.br / admin123<br>
-                            Setor: setor@pci.rn.gov.br / setor123
+                            <strong>Login de funcionamento:</strong><br>
+                            Admin: admin@pci.rn.gov.br / admin123
                         </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Modal de Recuperação de Senha -->
+        <div id="forgot-password-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Recuperar Senha</h2>
+                    <button type="button" class="btn-close" data-dismiss="modal">×</button>
+                </div>
+                <div class="modal-body">
+                    <div id="forgot-password-step1" class="recovery-step active">
+                        <p>Digite seu e-mail cadastrado para receber um link de recuperação de senha.</p>
+                        <div class="form-group">
+                            <label for="recovery-email-input">E-mail</label>
+                            <input 
+                                type="email" 
+                                id="recovery-email-input" 
+                                placeholder="Digite seu e-mail"
+                                required
+                            >
+                        </div>
+                    </div>
+                    <div id="forgot-password-step2" class="recovery-step" style="display: none;">
+                        <div class="alert alert-success">
+                            <strong>✓ Email Enviado!</strong>
+                            <p>Verifique seu e-mail para o link de recuperação de senha.</p>
+                            <p class="text-muted" style="margin-top: 10px; font-size: 0.9em;">
+                                <strong>Dica de Desenvolvimento:</strong> Use o token abaixo para redefinir sua senha.
+                            </p>
+                            <div style="background: #f5f5f5; padding: 10px; border-radius: 4px; margin-top: 10px; word-break: break-all;">
+                                <small id="recovery-token-display"></small>
+                            </div>
+                            <p style="margin-top: 10px; font-size: 0.85em;">
+                                <strong>Link:</strong> <a id="recovery-link-display" href="#" style="color: #003d99; word-break: break-all;"></a>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
+                    <button type="button" class="btn btn-primary" id="btn-send-recovery-email">Enviar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção de Reset de Senha -->
+        <section id="reset-password-section" class="login-section" style="display: none;">
+            <div class="login-container">
+                <div class="login-box">
+                    <div class="login-header">
+                        <div class="logo-container">
+                            <img src="./assets/images/logo-sge-pci-removebg-preview.png" alt="SGE PCI/RN" class="login-logo">
+                        </div>
+                        <h1>SGE PCI/RN</h1>
+                        <p class="subtitle">Redefinir Senha</p>
+                    </div>
+
+                    <form id="reset-password-form" class="login-form">
+                        <div class="form-group">
+                            <label for="reset-token-input">Token de Recuperação</label>
+                            <input 
+                                type="text" 
+                                id="reset-token-input" 
+                                placeholder="Cole o token enviado por e-mail"
+                                required
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="reset-email-input">E-mail</label>
+                            <input 
+                                type="email" 
+                                id="reset-email-input" 
+                                placeholder="Seu e-mail"
+                                required
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="reset-new-password-input">Nova Senha</label>
+                            <input 
+                                type="password" 
+                                id="reset-new-password-input" 
+                                placeholder="Digite a nova senha"
+                                required
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="reset-confirm-password-input">Confirmar Senha</label>
+                            <input 
+                                type="password" 
+                                id="reset-confirm-password-input" 
+                                placeholder="Confirme a nova senha"
+                                required
+                            >
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-login">
+                            <i class="fas fa-save"></i> Redefinir Senha
+                        </button>
+                    </form>
+
+                    <div class="login-links">
+                        <button id="btn-back-to-login" type="button" class="btn-link">Voltar ao Login</button>
                     </div>
                 </div>
             </div>
@@ -85,14 +205,14 @@
             <header class="dashboard-header">
                 <div class="header-top">
                     <div class="logo-area">
-                        <i class="fas fa-shield-alt"></i>
-                        <span>SMP PCI</span>
+                        <img src="./assets/images/logo-sge-pci-removebg-preview.png" alt="SGE PCI/RN" class="header-logo">
+                        <span>SGE PCI</span>
                     </div>
                     
                     <div class="header-actions">
                         <div class="search-box">
                             <i class="fas fa-search"></i>
-                            <input type="text" placeholder="Buscar processos...">
+                            <input id="process-search-header" type="text" placeholder="Buscar processos..." aria-label="Buscar processos">
                         </div>
                         
                         <div class="user-menu">
@@ -102,7 +222,7 @@
                             </button>
                             
                             <div class="user-profile">
-                                <img src="https://via.placeholder.com/32" alt="Usuário" class="user-avatar">
+                                <img src="./assets/images/logo-sge-pci-removebg-preview.png" alt="Usuário" class="user-avatar">
                                 <div class="user-info">
                                     <span class="user-name">Admin</span>
                                     <span class="user-role">NGE</span>
@@ -161,6 +281,9 @@
                     <button class="nav-item nge-only" data-tab="configuracoes" data-role="NGE">
                         <i class="fas fa-sliders-h"></i> Configurações
                     </button>
+                    <button class="nav-item common-item" data-tab="aprovacoes" data-role="ALL">
+                        <i class="fas fa-clipboard-check"></i> Aprovações
+                    </button>
                 </nav>
             </header>
 
@@ -178,7 +301,7 @@
                                 <h3>Processos Ativos</h3>
                                 <i class="fas fa-tasks icon-primary"></i>
                             </div>
-                            <div class="metric-value" data-metric="processos-ativos">152</div>
+                            <div class="metric-value" data-metric="processos-ativos">0</div>
                             <div class="metric-change positive">
                                 <i class="fas fa-arrow-up"></i> 12% vs mês anterior
                             </div>
@@ -189,7 +312,7 @@
                                 <h3>Conformidade Geral</h3>
                                 <i class="fas fa-check-circle icon-success"></i>
                             </div>
-                            <div class="metric-value" data-metric="conformidade">86%</div>
+                            <div class="metric-value" data-metric="conformidade">0%</div>
                             <div class="metric-change positive">
                                 <i class="fas fa-arrow-up"></i> 5% vs trimestre anterior
                             </div>
@@ -200,7 +323,7 @@
                                 <h3>Total de Atividades</h3>
                                 <i class="fas fa-list-check icon-info"></i>
                             </div>
-                            <div class="metric-value">11,8 mil</div>
+                            <div class="metric-value" data-metric="atividades-total-nge">0</div>
                             <div class="metric-change positive">
                                 <i class="fas fa-arrow-up"></i> 8% vs período anterior
                             </div>
@@ -211,9 +334,9 @@
                                 <h3>Alertas Críticos</h3>
                                 <i class="fas fa-exclamation-triangle icon-warning"></i>
                             </div>
-                            <div class="metric-value">28</div>
+                            <div class="metric-value" data-metric="alertas-criticos-nge">0</div>
                             <div class="metric-change negative">
-                                <i class="fas fa-arrow-down"></i> 3 resolvidos hoje
+                                <i class="fas fa-exclamation"></i> Requerem ação
                             </div>
                         </div>
                     </div>
@@ -252,6 +375,53 @@
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- Auditoria de Acessos (visível apenas para NGE) -->
+                    <div class="table-card nge-only" style="margin-top: 12px;">
+                        <h3>Auditoria de Acessos</h3>
+                        <p class="subtitle">Visualizar logs de ações do sistema (somente NGE).</p>
+                        <div class="filter-bar">
+                            <input id="audit-search" class="search-input" type="search" placeholder="Buscar por usuário, ação, tabela ou IP" />
+                            <select id="audit-filter-table" class="filter-select">
+                                <option value="">Todas as tabelas</option>
+                            </select>
+                            <button id="btn-open-audit" class="btn btn-primary">Abrir Auditoria</button>
+                        </div>
+                    </div>
+
+                    <!-- Modal de Auditoria -->
+                    <div id="audit-modal" class="modal" style="display: none;">
+                        <div class="modal-content modal-large">
+                            <div class="modal-header">
+                                <h2>Auditoria de Acessos</h2>
+                                <button class="modal-close" type="button">&times;</button>
+                            </div>
+                            <div class="modal-body">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Data</th>
+                                            <th>Usuário</th>
+                                            <th>Ação</th>
+                                            <th>Tabela</th>
+                                            <th>ID</th>
+                                            <th>IP</th>
+                                            <th>User Agent</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="audit-logs-body">
+                                        <tr>
+                                            <td colspan="7" class="text-center text-muted">Nenhum registro</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="modal-footer">
+                                <button class="btn btn-secondary modal-close">Fechar</button>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
 
                 <!-- Dashboard Setor -->
@@ -265,17 +435,26 @@
                                 <h3>Meus Processos</h3>
                                 <i class="fas fa-folder-open icon-primary"></i>
                             </div>
-                            <div class="metric-value" data-metric="processos-setor">12</div>
+                            <div class="metric-value" data-metric="processos-setor">0</div>
                             <div class="metric-label">Ativos neste período</div>
                         </div>
 
                         <div class="metric-card">
                             <div class="metric-header">
-                                <h3>Conformidade Setor</h3>
+                                <h3>Conformidade</h3>
                                 <i class="fas fa-check-circle icon-success"></i>
                             </div>
-                            <div class="metric-value" data-metric="conformidade-setor">89%</div>
-                            <div class="metric-label">Média do período</div>
+                            <div class="metric-value" data-metric="conformidade-setor">0%</div>
+                            <div class="metric-label">Checklist concluído</div>
+                        </div>
+
+                        <div class="metric-card">
+                            <div class="metric-header">
+                                <h3>Atividades Concluídas</h3>
+                                <i class="fas fa-check-double icon-success"></i>
+                            </div>
+                            <div class="metric-value" data-metric="atividades-concluidas-setor">0</div>
+                            <div class="metric-label">Checklist ok</div>
                         </div>
 
                         <div class="metric-card">
@@ -283,19 +462,8 @@
                                 <h3>Atividades Pendentes</h3>
                                 <i class="fas fa-hourglass-end icon-warning"></i>
                             </div>
-                            <div class="metric-value" data-metric="atividades-pendentes-setor">9,6 mil</div>
+                            <div class="metric-value" data-metric="atividades-pendentes-setor">0</div>
                             <div class="metric-label">Aguardando conclusão</div>
-                        </div>
-
-                        <div class="metric-card">
-                            <div class="metric-header">
-                                <h3>Tarefas em Atraso</h3>
-                                <i class="fas fa-clock icon-danger"></i>
-                            </div>
-                            <div class="metric-value" data-metric="tarefas-atraso-setor">5</div>
-                            <div class="metric-change negative">
-                                <i class="fas fa-exclamation"></i> Requerem ação
-                            </div>
                         </div>
                     </div>
 
@@ -317,25 +485,32 @@
                     <h2>Meus Processos</h2>
                     <p class="subtitle">Visualizar e gerenciar processos</p>
 
-                    <div class="filter-bar">
-                        <input type="text" placeholder="Buscar por nome..." class="search-input">
-                        <select class="filter-select">
-                            <option value="">Todas as fases</option>
-                            <option value="Planejar">Planejar</option>
-                            <option value="Analisar">Analisar</option>
-                            <option value="Desenhar">Desenhar</option>
-                            <option value="Implementar">Implementar</option>
-                            <option value="Monitorar">Monitorar</option>
-                        </select>
-                        <button class="btn btn-secondary">
-                            <i class="fas fa-filter"></i> Filtros Avançados
-                        </button>
-                    </div>
+                    <div class="meus-processos-layout">
+                        <section class="process-panel-left">
+                            <div class="filter-bar">
+                                <input type="text" id="process-search" placeholder="Buscar por nome, setor ou responsável..." class="search-input">
+                                <select id="process-phase-filter" class="filter-select">
+                                    <option value="">Todas as fases</option>
+                                    <option value="Planejar">Planejar</option>
+                                    <option value="Analisar">Analisar</option>
+                                    <option value="Desenhar">Desenhar</option>
+                                    <option value="Implementar">Implementar</option>
+                                    <option value="Monitorar">Monitorar</option>
+                                </select>
+                            </div>
 
-                    <div class="processes-list" id="processes-list">
-                        <div class="loading-spinner">
-                            <i class="fas fa-spinner fa-spin"></i> Carregando processos...
-                        </div>
+                            <div class="processes-list" id="processes-list">
+                                <div class="loading-spinner">
+                                    <i class="fas fa-spinner fa-spin"></i> Carregando processos...
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="process-panel-right" id="process-detail-panel">
+                            <div class="empty-detail">
+                                <h3>Selecione uma atividade para visualizar e editar seu conteúdo.</h3>
+                            </div>
+                        </section>
                     </div>
                 </div>
 
@@ -485,27 +660,47 @@
                     <h2>Indicadores de Desempenho (KPIs)</h2>
                     <p class="subtitle">Monitore os indicadores chave de desempenho</p>
 
-                    <div class="filter-bar">
-                        <select class="filter-select">
-                            <option value="">Todos os tipos</option>
-                            <option value="Eficiência">Eficiência</option>
-                            <option value="Eficácia">Eficácia</option>
-                            <option value="Conformidade">Conformidade</option>
-                            <option value="Qualidade">Qualidade</option>
+                    <div class="filter-bar indicators-filter-bar">
+                        <input id="indicator-search" class="search-input" type="search" placeholder="Buscar por indicador, processo ou responsável" />
+                        <select id="indicator-process-filter" class="filter-select">
+                            <option value="">Todos os processos</option>
+                        </select>
+                        <select id="indicator-source-filter" class="filter-select">
+                            <option value="">Todas as origens</option>
+                        </select>
+                        <select id="indicator-status-filter" class="filter-select">
+                            <option value="">Todos os status</option>
+                            <option value="Ativo">Ativo</option>
+                            <option value="Inativo">Inativo</option>
+                            <option value="Em implantação">Em implantação</option>
+                            <option value="Implantada">Implantada</option>
+                            <option value="Suspensa">Suspensa</option>
+                        </select>
+                        <select id="indicator-responsible-filter" class="filter-select">
+                            <option value="">Todos os responsáveis</option>
                         </select>
                     </div>
 
-                    <div class="indicators-grid" id="indicators-grid">
-                        <div class="loading-spinner">
-                            <i class="fas fa-spinner fa-spin"></i> Carregando indicadores...
+                    <div class="indicators-layout">
+                        <div id="indicator-list" class="indicator-list">
+                            <div class="loading-spinner">
+                                <i class="fas fa-spinner fa-spin"></i> Carregando indicadores...
+                            </div>
                         </div>
+
+                        <aside id="indicator-detail-panel" class="indicator-detail-panel">
+                            <div class="empty-detail">
+                                <h3>Selecione um indicador para visualizar detalhes.</h3>
+                                <p>Use os filtros à esquerda ou clique em um cartão para ver medições, histórico e ações.</p>
+                            </div>
+                        </aside>
                     </div>
                 </div>
 
                 <!-- Relatórios -->
                 <div id="relatorios" class="tab-content">
                     <h2>Relatórios</h2>
-                    <p class="subtitle">Gerar e exportar relatórios de processos e indicadores</p>
+                    <p class="subtitle">Gerar e exportar relatórios de processos e indicadores em formato CSV ou PDF</p>
 
                     <div class="reports-container">
                         <div class="report-card">
@@ -515,12 +710,17 @@
                             </div>
                             <p>Exportar dados completos de todos os processos em formato CSV ou PDF</p>
                             <div class="report-filters">
-                                <input type="date" class="date-input">
-                                <input type="date" class="date-input">
+                                <input type="date" class="date-input" placeholder="Data inicial">
+                                <input type="date" class="date-input" placeholder="Data final">
                             </div>
-                            <button class="btn btn-primary" data-report-action="export-processos">
-                                <i class="fas fa-download"></i> Exportar
-                            </button>
+                            <div class="button-group">
+                                <button class="btn btn-primary" data-report-action="export-processos">
+                                    <i class="fas fa-file-csv"></i> Exportar CSV
+                                </button>
+                                <button class="btn btn-secondary" data-report-action="export-processos-pdf">
+                                    <i class="fas fa-file-pdf"></i> Exportar PDF
+                                </button>
+                            </div>
                         </div>
 
                         <div class="report-card">
@@ -533,10 +733,17 @@
                                 <select class="filter-select">
                                     <option>Todos os setores</option>
                                 </select>
+                                <input type="date" class="date-input" placeholder="Data inicial">
+                                <input type="date" class="date-input" placeholder="Data final">
                             </div>
-                            <button class="btn btn-primary" data-report-action="export-indicadores">
-                                <i class="fas fa-download"></i> Exportar
-                            </button>
+                            <div class="button-group">
+                                <button class="btn btn-primary" data-report-action="export-indicadores">
+                                    <i class="fas fa-file-csv"></i> Exportar CSV
+                                </button>
+                                <button class="btn btn-secondary" data-report-action="export-indicadores-pdf">
+                                    <i class="fas fa-file-pdf"></i> Exportar PDF
+                                </button>
+                            </div>
                         </div>
 
                         <div class="report-card">
@@ -544,13 +751,69 @@
                                 <i class="fas fa-history"></i>
                                 <h3>Histórico de Mudanças</h3>
                             </div>
-                            <p>Logs de todas as alterações realizadas nos processos</p>
+                            <p>Logs de todas as alterações realizadas no sistema</p>
                             <div class="report-filters">
-                                <input type="date" class="date-input">
+                                <input type="date" class="date-input" placeholder="Data inicial">
+                                <input type="date" class="date-input" placeholder="Data final">
                             </div>
-                            <button class="btn btn-primary" data-report-action="export-historico">
-                                <i class="fas fa-download"></i> Exportar
-                            </button>
+                            <div class="button-group">
+                                <button class="btn btn-primary" data-report-action="export-historico">
+                                    <i class="fas fa-file-csv"></i> Exportar CSV
+                                </button>
+                                <button class="btn btn-secondary" data-report-action="export-historico-pdf">
+                                    <i class="fas fa-file-pdf"></i> Exportar PDF
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Aprovações -->
+                <div id="aprovacoes" class="tab-content">
+                    <h2>Aprovações e cadeia hierárquica</h2>
+                    <p class="subtitle">Analise pendências, fluxo de aprovação e alcance das unidades.</p>
+
+                    <div class="approval-summary-grid">
+                        <div class="metric-card">
+                            <div class="metric-header">
+                                <h3>Pendências para aprovação</h3>
+                                <i class="fas fa-hourglass-half icon-warning"></i>
+                            </div>
+                            <div class="metric-value" data-metric="pendencias-aprovacao">6</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-header">
+                                <h3>Fluxos em revisão</h3>
+                                <i class="fas fa-route icon-info"></i>
+                            </div>
+                            <div class="metric-value" data-metric="fluxos-revisao">3</div>
+                        </div>
+                    </div>
+
+                    <div class="approval-panel">
+                        <div class="approval-list">
+                            <h3>Fila de aprovação</h3>
+                            <div class="approval-item">
+                                <strong>Plano de Implementação</strong>
+                                <p>Regional Natal · Enviado para análise</p>
+                                <span class="badge badge-warning">Pendente</span>
+                            </div>
+                            <div class="approval-item">
+                                <strong>Indicadores de Perícia</strong>
+                                <p>Assessoria Técnica · Aguardando validação</p>
+                                <span class="badge badge-info">Em revisão</span>
+                            </div>
+                        </div>
+                        <div class="approval-list">
+                            <h3>Escopo operacional</h3>
+                            <div class="approval-item">
+                                <strong>Unidades visíveis</strong>
+                                <p>Instituto, Regional, Assessoria, Núcleo e Setor</p>
+                            </div>
+                            <div class="approval-item">
+                                <strong>Regra de bloqueio</strong>
+                                <p>Perfis com escopo restrito não visualizam unidades fora do seu alcance.</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -562,43 +825,142 @@
 
                     <div class="settings-container">
                         <div class="settings-section">
+                            <h3>Estrutura Organizacional</h3>
+                            <div class="approval-panel">
+                                <div class="approval-list">
+                                    <h3>Institutos</h3>
+                                    <div id="org-institutes-list" class="approval-item">Carregando...</div>
+                                </div>
+                                <div class="approval-list">
+                                    <h3>Regionais</h3>
+                                    <div id="org-regionais-list" class="approval-item">Carregando...</div>
+                                </div>
+                                <div class="approval-list">
+                                    <h3>Subcoordenações</h3>
+                                    <div id="org-subcoord-list" class="approval-item">Carregando...</div>
+                                </div>
+                                <div class="approval-list">
+                                    <h3>Assessorias</h3>
+                                    <div id="org-assessorias-list" class="approval-item">Carregando...</div>
+                                </div>
+                                <div class="approval-list">
+                                    <h3>Núcleos</h3>
+                                    <div id="org-nuclei-list" class="approval-item">Carregando...</div>
+                                </div>
+                                <div class="approval-list">
+                                    <h3>Setores</h3>
+                                    <div id="org-sectors-list" class="approval-item">Carregando...</div>
+                                </div>
+                            </div>
+
+                            <form id="org-structure-form" class="user-form" style="margin-top: 1.5rem;">
+                                <div id="org-structure-error" class="form-errors" role="alert"></div>
+                                <div class="form-row">
+                                    <label for="org-structure-type">Tipo</label>
+                                    <select id="org-structure-type">
+                                        <option value="INSTITUTO">Instituto</option>
+                                        <option value="REGIONAL">Regional</option>
+                                        <option value="SUBCOORDENACAO">Subcoordenação</option>
+                                        <option value="ASSESSORIA">Assessoria</option>
+                                        <option value="NUCLEO">Núcleo</option>
+                                        <option value="SETOR">Setor</option>
+                                    </select>
+                                </div>
+                                <div class="form-row">
+                                    <label for="org-structure-name">Nome da unidade</label>
+                                    <input id="org-structure-name" type="text" placeholder="Ex.: Instituto de Criminalística" />
+                                </div>
+                                <div class="form-row" id="org-structure-parent-group" style="display: none;">
+                                    <label for="org-structure-parent">Vincular a</label>
+                                    <select id="org-structure-parent"></select>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" class="btn btn-primary" id="org-structure-save">Salvar Unidade</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="settings-section">
                             <h3>Gerenciamento de Usuários</h3>
-                            <button type="button" class="btn btn-primary" id="show-add-user-form-btn">
+                            <button type="button" class="btn btn-primary" id="show-add-user-form-btn" data-action="toggle-user-form">
                                 <i class="fas fa-user-plus"></i> Adicionar Usuário
                             </button>
 
                             <form id="add-user-form" class="user-form" style="margin-top: 1rem; display: none;">
+                                <div id="new-user-errors" class="form-errors" role="alert"></div>
                                 <div class="form-row">
                                     <label for="new-user-name">Nome completo</label>
-                                    <input id="new-user-name" type="text" required placeholder="Ex: João da Silva" />
+                                    <input id="new-user-name" type="text" placeholder="Ex: João da Silva" />
+                                </div>
+                                <div class="form-row">
+                                    <label for="new-user-registration">Matrícula</label>
+                                    <input id="new-user-registration" type="text" placeholder="Ex: 000123" />
                                 </div>
                                 <div class="form-row">
                                     <label for="new-user-email">E-mail institucional</label>
-                                    <input id="new-user-email" type="email" required placeholder="exemplo@pci.rn.gov.br" />
+                                    <input id="new-user-email" type="email" placeholder="exemplo@pci.rn.gov.br" />
                                 </div>
                                 <div class="form-row">
                                     <label for="new-user-password">Senha temporária</label>
-                                    <input id="new-user-password" type="password" required placeholder="Senha inicial" />
+                                    <input id="new-user-password" type="password" placeholder="Mínimo 8 caracteres" />
+                                </div>
+                                <div class="form-row">
+                                    <label for="new-user-confirm-password">Confirmar senha</label>
+                                    <input id="new-user-confirm-password" type="password" placeholder="Repita a senha" />
                                 </div>
                                 <div class="form-row">
                                     <label for="new-user-role">Perfil</label>
-                                    <select id="new-user-role" required>
+                                    <select id="new-user-role">
                                         <option value="NGE">NGE</option>
-                                        <option value="SETOR">SETOR</option>
+                                        <option value="DIRETOR_INSTITUTO">Diretor de Instituto</option>
+                                        <option value="SUBCOORDENADOR_REGIONAL">Subcoordenador de Regional</option>
+                                        <option value="SUBCOORDENADOR_INSTITUTO">Subcoordenador de Instituto</option>
+                                        <option value="SUBCOORDENADOR_FINANCEIRA">Subcoordenador Financeiro</option>
+                                        <option value="SUBCOORDENADOR_ADMINISTRATIVA">Subcoordenador Administrativo</option>
+                                        <option value="ASSESSOR">Assessor</option>
+                                        <option value="CHEFE_NUCLEO">Chefe de Núcleo</option>
+                                        <option value="CHEFE_SETOR">Chefe de Setor</option>
+                                        <option value="OPERACIONAL">Operacional</option>
                                     </select>
                                 </div>
                                 <div class="form-row">
-                                    <label for="new-user-setor">Setor</label>
-                                    <select id="new-user-setor">
-                                        <option value="">-- Selecione um setor (apenas SETOR) --</option>
-                                        <option value="1">Genética</option>
-                                        <option value="2">Química</option>
-                                        <option value="3">Documentoscopia</option>
-                                        <option value="4">Balística</option>
-                                        <option value="5">Fotografia</option>
+                                    <label for="new-user-organization-type">Tipo de unidade</label>
+                                    <select id="new-user-organization-type">
+                                        <option value="NGE">NGE</option>
+                                        <option value="INSTITUTO">Instituto</option>
+                                        <option value="REGIONAL">Regional</option>
+                                        <option value="ASSESSORIA">Assessoria</option>
+                                        <option value="NUCLEO">Núcleo</option>
+                                        <option value="SETOR">Setor</option>
                                     </select>
                                 </div>
-                                <button type="submit" class="btn btn-primary">Criar Usuário</button>
+                                <div class="form-row" id="new-user-unit-group">
+                                    <label for="new-user-unit">Unidade principal</label>
+                                    <select id="new-user-unit"></select>
+                                </div>
+                                <div class="form-row" id="new-user-nucleus-group">
+                                    <label for="new-user-nucleus">Núcleo</label>
+                                    <select id="new-user-nucleus"></select>
+                                </div>
+                                <div class="form-row" id="new-user-sector-group">
+                                    <label for="new-user-sector">Setor</label>
+                                    <select id="new-user-sector"></select>
+                                </div>
+                                <div class="form-row">
+                                    <label for="new-user-status">Status</label>
+                                    <select id="new-user-status">
+                                        <option value="true">Ativo</option>
+                                        <option value="false">Inativo</option>
+                                    </select>
+                                </div>
+                                <div class="form-row">
+                                    <label for="new-user-observations">Observações</label>
+                                    <textarea id="new-user-observations" rows="3" placeholder="Informações adicionais"></textarea>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" class="btn btn-secondary" data-action="cancel-user-form">Cancelar</button>
+                                    <button type="button" class="btn btn-primary" data-action="save-user">Salvar Usuário</button>
+                                </div>
                             </form>
 
                             <table class="data-table" id="users-table">
@@ -624,6 +986,57 @@
         </section>
     </div>
 
+    <!-- Modal de Detalhes do Monitoramento BPM -->
+    <div id="bpm-details-modal" class="modal" style="display: none;">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2 id="bpm-modal-title">Detalhes - Fase BPM</h2>
+                <button class="modal-close" type="button">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Filtros (visíveis apenas para Admin) -->
+                <div id="bpm-filters" class="filter-bar" style="margin-bottom: 20px;">
+                    <input id="bpm-user-filter" type="text" placeholder="Filtrar por usuário..." class="search-input">
+                    <select id="bpm-setor-filter" class="filter-select">
+                        <option value="">Todos os setores</option>
+                    </select>
+                    <select id="bpm-status-filter" class="filter-select">
+                        <option value="">Todos os status</option>
+                        <option value="Planejar">Planejar</option>
+                        <option value="Analisar">Analisar</option>
+                        <option value="Desenhar">Desenhar</option>
+                        <option value="Implementar">Implementar</option>
+                        <option value="Monitorar">Monitorar</option>
+                    </select>
+                </div>
+
+                <!-- Tabela de Detalhes -->
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Usuário</th>
+                            <th>Processo</th>
+                            <th>Setor</th>
+                            <th>Fase</th>
+                            <th>Progresso</th>
+                            <th>Data Início</th>
+                            <th>Data Fim</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bpm-details-tbody">
+                        <tr>
+                            <td colspan="8" class="text-center text-muted">Carregando detalhes...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary modal-close">Fechar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal de Confirmação -->
     <div id="modal-confirmacao" class="modal">
         <div class="modal-content">
@@ -635,7 +1048,7 @@
                 <p id="modal-texto"></p>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
+                <button class="btn btn-secondary btn-close">Cancelar</button>
                 <button class="btn btn-primary" id="btn-confirmar">Confirmar</button>
             </div>
         </div>
@@ -644,11 +1057,13 @@
     <!-- Scripts -->
     <script src="./js/auth.js"></script>
     <script src="./js/utils.js"></script>
+    <script src="./js/access-control.js"></script>
     <script src="./js/processes.js"></script>
     <script src="./js/indicators.js"></script>
     <script src="./js/dashboard.js"></script>
     <script src="./js/reports.js"></script>
     <script src="./js/settings.js"></script>
+    <script src="./js/bpm-details.js"></script>
     <script src="./js/app.js"></script>
 </body>
 </html>

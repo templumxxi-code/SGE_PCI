@@ -31,7 +31,10 @@ let routesConfigured = false;
 let serverInstance = null;
 
 const parseCorsOrigins = () => {
-    const configured = process.env.CORS_ORIGINS || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000,http://127.0.0.1:3000');
+    const defaultOrigins = process.env.NODE_ENV === 'production'
+        ? ''
+        : 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001';
+    const configured = process.env.CORS_ORIGINS || defaultOrigins;
     return configured.split(',').map((value) => value.trim()).filter(Boolean);
 };
 
@@ -45,10 +48,14 @@ app.use(helmet());
 app.use(cors({
     origin: (origin, callback) => {
         const allowedOrigins = parseCorsOrigins();
-        if (!origin || allowedOrigins.includes(origin)) {
+        const localOriginPattern = /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/;
+
+        if (!origin || allowedOrigins.includes(origin) || localOriginPattern.test(origin)) {
             callback(null, true);
             return;
         }
+
+        console.warn('CORS origem bloqueada:', origin);
         callback(new Error('Origem não permitida pelo CORS'));
     },
     credentials: true,
@@ -79,42 +86,27 @@ const configureApiRoutes = async () => {
         return;
     }
 
-    // Prefer real API routes in test mode so functional tests exercise
-    // the real controllers/middleware backed by pg-mem. Allow an
-    // explicit override with USE_MOCK_API=true when needed.
-    let useMock = process.env.USE_MOCK_API === 'true';
+    const authRoutes = require('./routes/auth');
+    const processRoutes = require('./routes/processes');
+    const indicatorRoutes = require('./routes/indicators');
+    const reportRoutes = require('./routes/reports');
+    const attachmentRoutes = require('./routes/attachments');
+    const planejarRoutes = require('./routes/planejar');
 
-    if (process.env.NODE_ENV === 'test') {
-        useMock = false;
-    }
-
+    const useMock = process.env.USE_MOCK_API === 'true';
     app.locals.authMode = useMock ? 'mock' : 'database';
-
-    if (!useMock) {
-        try {
-            const client = await db.pool.connect();
-            client.release();
-        } catch (error) {
-            console.warn('⚠️ Banco de dados inacessível. Iniciando modo mock local.');
-            useMock = true;
-        }
-    }
 
     if (useMock) {
         app.use('/api', mockApiRoutes);
         console.log('✔️  API mock local ativada. Nenhum banco de dados é necessário.');
     } else {
-        const authRoutes = require('./routes/auth');
-        const processRoutes = require('./routes/processes');
-        const indicatorRoutes = require('./routes/indicators');
-        const reportRoutes = require('./routes/reports');
-        const attachmentRoutes = require('./routes/attachments');
-
         app.use('/api/auth', authRoutes);
         app.use('/api/processes', processRoutes);
         app.use('/api/indicators', indicatorRoutes);
         app.use('/api/reports', reportRoutes);
+        app.use('/api/planejar', planejarRoutes);
         app.use('/api', attachmentRoutes);
+        console.log('✔️  Rotas reais de autenticação e usuários ativadas com armazenamento local.');
     }
 
     routesConfigured = true;

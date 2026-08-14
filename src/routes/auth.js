@@ -117,6 +117,47 @@ router.post('/alterar-senha', verifyToken, async (req, res, next) => {
 });
 
 /**
+ * DELETE /api/auth/usuarios/:id
+ * Deletar/Inativar usuário
+ */
+router.delete('/usuarios/:id', verifyToken, requireAdmin, async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        
+        // Validar ID
+        if (!id || isNaN(parseInt(id))) {
+            return res.status(400).json({ error: 'ID de usuário inválido' });
+        }
+        
+        // Não permitir deletar a si mesmo
+        if (req.user.id === parseInt(id)) {
+            return res.status(400).json({ error: 'Não é possível deletar sua própria conta.' });
+        }
+
+        const resultado = await authController.deletarUsuario(id);
+        res.status(200).json({ message: 'Usuário inativado com sucesso', usuario: resultado });
+    } catch (error) {
+        next(error);
+    }
+});
+
+/**
+ * PUT /api/auth/usuarios/:id/status
+ * Inativar/Ativar usuário
+ */
+router.put('/usuarios/:id/status', verifyToken, requireAdmin, async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { active } = req.body;
+
+        const resultado = await authController.atualizarStatusUsuario(id, active);
+        res.json({ message: 'Status atualizado com sucesso', usuario: resultado });
+    } catch (error) {
+        next(error);
+    }
+});
+
+/**
  * GET /api/auth/perfil
  * Obter perfil do usuário autenticado
  */

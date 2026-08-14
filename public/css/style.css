@@ -3,6 +3,13 @@
    Polícia Científica do Rio Grande do Norte
    ============================================================================ */
 
+/* Fallback para fonts do sistema (sem dependência de CDN) */
+@supports (font-family: system-ui) {
+    :root {
+        --font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    }
+}
+
 /* ============================================================================
    Variáveis CSS (Cores e Design Token)
    ============================================================================ */
@@ -42,7 +49,7 @@
     --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.15);
     
     /* Tipografia */
-    --font-family: 'Inter', sans-serif;
+    --font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     --font-size-sm: 12px;
     --font-size-base: 14px;
     --font-size-md: 16px;
@@ -207,6 +214,16 @@ textarea {
     transition: all var(--transition-base);
 }
 
+.login-select {
+    appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--color-text) 50%),
+                      linear-gradient(135deg, var(--color-text) 50%, transparent 50%),
+                      linear-gradient(to right, var(--color-border), var(--color-border));
+    background-position: calc(100% - 20px) calc(1em + 2px), calc(100% - 15px) calc(1em + 2px), 100% 100%;
+    background-size: 5px 5px, 5px 5px, 1px 1.5em;
+    background-repeat: no-repeat;
+}
+
 input:focus,
 select:focus,
 textarea:focus {
@@ -344,6 +361,24 @@ textarea {
 
 .data-table tbody tr:hover {
     background-color: var(--color-bg);
+}
+
+/* Team Member Responsibilities List */
+.team-member-responsibilities {
+    margin: 0;
+    padding-left: 16px;
+    white-space: normal;
+    overflow-wrap: break-word;
+}
+
+.team-member-responsibilities li {
+    margin-bottom: 4px;
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+}
+
+.text-muted {
+    color: var(--color-text-secondary);
 }
 
 /* ============================================================================
@@ -582,4 +617,164 @@ textarea {
     font-size: 3rem;
     margin-bottom: var(--spacing-lg);
     opacity: 0.3;
+}
+
+/* ============================================================================
+   Modais
+   ============================================================================ */
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn var(--transition-base);
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background-color: var(--color-white);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-lg);
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    animation: slideIn var(--transition-base);
+}
+
+.modal-small .modal-content {
+    max-width: 400px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: var(--font-size-lg);
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--color-text-secondary);
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color var(--transition-fast);
+}
+
+.modal-close:hover {
+    color: var(--color-text);
+}
+
+.modal-body {
+    padding: var(--spacing-lg);
+}
+
+.modal-footer {
+    display: flex;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+    border-top: 1px solid var(--color-border);
+    justify-content: flex-end;
+}
+
+.modal-footer .btn {
+    margin: 0;
+}
+
+/* ============================================================================
+   Recuperação de Senha
+   ============================================================================ */
+
+.login-links {
+    text-align: center;
+    margin-top: var(--spacing-lg);
+    padding-top: var(--spacing-lg);
+    border-top: 1px solid var(--color-border);
+}
+
+.btn-link {
+    background: none;
+    border: none;
+    color: var(--color-primary);
+    cursor: pointer;
+    font-size: 0.9em;
+    padding: 0;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.btn-link:hover {
+    color: var(--color-primary-dark);
+    text-decoration: underline;
+}
+
+.recovery-step {
+    animation: fadeIn 0.3s ease;
+}
+
+.recovery-step.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.alert {
+    padding: var(--spacing-md);
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacing-md);
+}
+
+.alert-success {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.alert-success strong {
+    font-weight: 600;
+}
+
+.alert-success p {
+    margin: 8px 0;
+    font-size: 0.95em;
+}
+
+.text-muted {
+    color: var(--color-text-secondary);
+}
+
+#recovery-token-display,
+#recovery-link-display {
+    word-break: break-all;
+    font-family: monospace;
 }

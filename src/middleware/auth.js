@@ -4,6 +4,7 @@
 
 const jwt = require('jsonwebtoken');
 const { queryOne } = require('../models/db');
+const { normalizePerfil, isGlobalAdmin, isAnySectorRole } = require('../services/roles');
 
 const getJwtSecret = () => {
     const secret = process.env.JWT_SECRET;
@@ -36,7 +37,11 @@ const verifyToken = async (req, res, next) => {
             if (logoutTimestamp && decoded.iat * 1000 <= logoutTimestamp.getTime()) {
                 return res.status(401).json({ error: 'Sessão inválida. Faça login novamente.' });
             }
-            req.user = decoded;
+            req.user = {
+                ...decoded,
+                perfil: normalizePerfil(decoded.perfil),
+                setor_id: decoded.setor_id
+            };
             return next();
         }
 
@@ -56,7 +61,7 @@ const verifyToken = async (req, res, next) => {
 
             req.user = {
                 ...decoded,
-                perfil: usuario.perfil,
+                perfil: normalizePerfil(usuario.perfil),
                 setor_id: usuario.setor_id,
                 ativo: usuario.ativo
             };
@@ -77,7 +82,7 @@ const verifyToken = async (req, res, next) => {
  * @param {function} next - Próximo middleware
  */
 const requireAdmin = (req, res, next) => {
-    if (req.user?.perfil !== 'NGE') {
+    if (!isGlobalAdmin(req.user?.perfil)) {
         return res.status(403).json({
             error: 'Acesso restrito a administradores'
         });
@@ -92,7 +97,7 @@ const requireAdmin = (req, res, next) => {
  * @param {function} next - Próximo middleware
  */
 const requireSetor = (req, res, next) => {
-    if (req.user?.perfil !== 'SETOR' && req.user?.perfil !== 'NGE') {
+    if (!isGlobalAdmin(req.user?.perfil) && !isAnySectorRole(req.user?.perfil)) {
         return res.status(403).json({
             error: 'Acesso restrito'
         });

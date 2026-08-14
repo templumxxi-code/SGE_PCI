@@ -21,10 +21,13 @@ class AuthManager {
         }
 
         const headers = {
-            'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
             ...options.headers
         };
+
+        if (!(options.body instanceof FormData)) {
+            headers['Content-Type'] = 'application/json';
+        }
 
         const response = await fetch(url, {
             ...options,
@@ -94,7 +97,12 @@ class AuthManager {
         });
 
         if (!response.ok) {
-            throw new Error(`Erro ao deletar: ${response.status}`);
+            try {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `Erro ao deletar: ${response.status}`);
+            } catch (e) {
+                throw new Error(`Erro ao deletar: ${response.status}`);
+            }
         }
 
         return await response.json();
@@ -129,6 +137,67 @@ class AuthManager {
      */
     static async registerUser(data) {
         return this.post('/auth/registrar', data);
+    }
+
+    /**
+     * Atualizar usuário
+     */
+    static async updateUser(id, data) {
+        return this.put(`/auth/usuarios/${id}`, data);
+    }
+
+    /**
+     * Deletar usuário (apenas admin)
+     */
+    static async deleteUser(id) {
+        return this.delete(`/auth/usuarios/${id}`);
+    }
+
+    /**
+     * Atualizar status do usuário (ativar/inativar)
+     */
+    static async updateUserStatus(id, active) {
+        return this.put(`/auth/usuarios/${id}/status`, { active });
+    }
+
+    /**
+     * Solicitar recuperação de senha
+     */
+    static async requestPasswordReset(email) {
+        const response = await fetch(`${this.baseUrl}/auth/solicitar-reset-senha`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erro ao solicitar reset de senha');
+        }
+
+        return await response.json();
+    }
+
+    /**
+     * Redefinir senha com token
+     */
+    static async resetPassword(email, token, novaSenha) {
+        const response = await fetch(`${this.baseUrl}/auth/reset-senha`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email, token, novaSenha })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erro ao redefinir senha');
+        }
+
+        return await response.json();
     }
 }
 

@@ -10,6 +10,19 @@ class SPMApp {
         this.init();
     }
 
+    getCurrentUserFromStorage() {
+        return window.AccessControl?.getCurrentUser?.() || null;
+    }
+
+    clearStaleSession() {
+        localStorage.removeItem('smp_token');
+        localStorage.removeItem('sge_pci_current_user');
+        const loginSection = document.getElementById('login-section');
+        const dashboardSection = document.getElementById('dashboard-section');
+        if (loginSection) loginSection.classList.add('active');
+        if (dashboardSection) dashboardSection.classList.remove('active');
+    }
+
     /**
      * Retorna a URL base da API, mesmo quando o app é aberto diretamente do arquivo
      */
@@ -20,13 +33,52 @@ class SPMApp {
         return `${window.location.origin}/api`;
     }
 
+    isRunningFromFile() {
+        return window.location.protocol === 'file:';
+    }
+
     /**
      * Inicializar aplicação
      */
     init() {
         this.setupEventListeners();
         this.checkEnvironment();
+        this.checkResetPasswordFlow();
         this.checkAuthentication();
+    }
+
+    async checkEnvironment() {
+        try {
+            await fetch(`${this.apiUrl}/health`);
+        } catch (error) {
+            console.warn('Backend não encontrado:', error);
+            if (window.location.protocol === 'file:') {
+                alert('O sistema está sendo aberto como arquivo local. Rode `npm run dev` e abra a aplicação em http://localhost:3000 para a melhor experiência.');
+            }
+        }
+    }
+
+    /**
+     * Verificar se há fluxo de reset de senha na URL
+     */
+    checkResetPasswordFlow() {
+        const params = new URLSearchParams(window.location.search);
+        const resetToken = params.get('reset');
+
+        if (resetToken) {
+            // Mostrar a seção de reset de senha
+            const loginSection = document.getElementById('login-section');
+            const resetSection = document.getElementById('reset-password-section');
+            const dashboardSection = document.getElementById('dashboard-section');
+
+            if (loginSection) loginSection.classList.remove('active');
+            if (resetSection) {
+                resetSection.style.display = 'block';
+                // Pré-preencher o token
+                document.getElementById('reset-token-input').value = resetToken;
+            }
+            if (dashboardSection) dashboardSection.classList.remove('active');
+        }
     }
 
     async checkEnvironment() {
@@ -55,6 +107,37 @@ class SPMApp {
             logoutBtnVisible.addEventListener('click', () => this.logout());
         }
 
+        // Recuperação de Senha
+        const btnForgotPassword = document.getElementById('btn-forgot-password');
+        if (btnForgotPassword) {
+            btnForgotPassword.addEventListener('click', () => this.showForgotPasswordModal());
+        }
+
+        const btnSendRecoveryEmail = document.getElementById('btn-send-recovery-email');
+        if (btnSendRecoveryEmail) {
+            btnSendRecoveryEmail.addEventListener('click', () => this.sendRecoveryEmail());
+        }
+
+        const btnBackToLogin = document.getElementById('btn-back-to-login');
+        if (btnBackToLogin) {
+            btnBackToLogin.addEventListener('click', () => this.backToLogin());
+        }
+
+        const resetPasswordForm = document.getElementById('reset-password-form');
+        if (resetPasswordForm) {
+            resetPasswordForm.addEventListener('submit', (e) => this.handleResetPassword(e));
+        }
+
+        // Modal close buttons
+        document.querySelectorAll('[data-dismiss="modal"]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const modal = e.target.closest('.modal');
+                if (modal) {
+                    modal.style.display = 'none';
+                }
+            });
+        });
+
         // Abas de navegação
         document.querySelectorAll('.nav-item').forEach(item => {
             item.addEventListener('click', (e) => this.switchTab(e));
@@ -64,6 +147,35 @@ class SPMApp {
         const loginForm = document.getElementById('login-form');
         if (loginForm) {
             loginForm.addEventListener('submit', (e) => this.handleLogin(e));
+        }
+
+        const loginProfileSelect = document.getElementById('login-profile-select');
+        if (loginProfileSelect) {
+            loginProfileSelect.addEventListener('change', () => this.applyLoginProfile(loginProfileSelect.value));
+        }
+
+        // Header search box (sync with process list filter)
+        const headerSearchInput = document.getElementById('process-search-header');
+        if (headerSearchInput) {
+            headerSearchInput.addEventListener('input', (event) => {
+                const searchValue = event.target.value || '';
+                const sideSearch = document.getElementById('process-search');
+                if (sideSearch) {
+                    sideSearch.value = searchValue;
+                    if (typeof ProcessManager?.renderProcesses === 'function') {
+                        ProcessManager.renderProcesses(ProcessManager.getStoredProcesses());
+                    }
+                }
+            });
+        }
+
+        const notificationButton = document.querySelector('.btn-notification');
+        if (notificationButton) {
+            notificationButton.addEventListener('click', () => {
+                if (typeof notificar === 'function') {
+                    notificar('Notificações não implementadas no momento.', 'info');
+                }
+            });
         }
 
         // Dropdown menu
@@ -89,6 +201,19 @@ class SPMApp {
         const loginSection = document.getElementById('login-section');
         const dashboardSection = document.getElementById('dashboard-section');
 
+        const storedUser = this.getCurrentUserFromStorage();
+        const staleStoredUser = storedUser && (
+            String(storedUser.email || '').toLowerCase() === 'setor@pci.rn.gov.br'
+            || String(storedUser.email || '').toLowerCase() === 'x@y.com'
+            || String(storedUser.email || '').toLowerCase() === 'novo@pci.rn.gov.br'
+            || String(storedUser.email || '').toLowerCase() === 'demo@pci.rn.gov.br'
+        );
+
+        if (staleStoredUser) {
+            this.clearStaleSession();
+            return;
+        }
+
         if (token) {
             try {
                 const response = await fetch(`${this.apiUrl}/auth/perfil`, {
@@ -99,7 +224,9 @@ class SPMApp {
 
                 if (response.ok) {
                     this.currentUser = await response.json();
+                    this.currentUser.perfil = this.normalizeProfile(this.currentUser.perfil);
                     this.isAuthenticated = true;
+                    window.AccessControl?.saveCurrentUser?.(this.currentUser);
                     this.showDashboard();
                 } else {
                     this.logout();
@@ -108,6 +235,11 @@ class SPMApp {
                 console.error('Erro ao verificar autenticação:', error);
                 this.logout();
             }
+        } else if (storedUser) {
+            this.currentUser = storedUser;
+            this.currentUser.perfil = this.normalizeProfile(this.currentUser.perfil || this.currentUser.role);
+            this.isAuthenticated = true;
+            this.showDashboard();
         } else {
             loginSection.classList.add('active');
             dashboardSection.classList.remove('active');
@@ -136,17 +268,20 @@ class SPMApp {
                 const data = await response.json();
                 this.setToken(data.token);
                 this.currentUser = data.usuario;
+                this.currentUser.perfil = this.normalizeProfile(this.currentUser.perfil);
                 this.isAuthenticated = true;
+                window.AccessControl?.saveCurrentUser?.(this.currentUser);
                 this.showDashboard();
                 document.getElementById('login-form').reset();
-            } else {
-                const error = await response.json();
-                alert('Erro no login: ' + (error.error || 'Credenciais inválidas'));
+                return;
             }
+
+            const error = await response.json().catch(() => ({}));
+            alert('Erro no login: ' + (error.error || 'Credenciais inválidas'));
         } catch (error) {
             console.error('Erro ao fazer login:', error);
             if (this.isRunningFromFile()) {
-                alert('Não foi possível conectar à API. Abra a aplicação via servidor local, por exemplo: `npm run dev` e acesse http://localhost:3000');
+                alert('Não foi possível conectar à API. Abra a aplicação via servidor local, por exemplo: npm run dev e acesse http://localhost:3000');
             } else {
                 alert('Erro na comunicação com o servidor. Verifique se o backend está ativo em http://localhost:3000');
             }
@@ -160,6 +295,8 @@ class SPMApp {
         this.removeToken();
         this.currentUser = null;
         this.isAuthenticated = false;
+        window.AccessControl?.saveCurrentUser?.(null);
+        localStorage.removeItem('sge_pci_current_user');
 
         const loginSection = document.getElementById('login-section');
         const dashboardSection = document.getElementById('dashboard-section');
@@ -181,6 +318,7 @@ class SPMApp {
 
         // Atualizar informações do usuário
         this.updateUserInfo();
+        window.AccessControl?.saveCurrentUser?.(this.currentUser);
 
         // Ajustar navegação e abas conforme perfil
         this.applyRolePermissions();
@@ -197,38 +335,28 @@ class SPMApp {
     updateUserInfo() {
         const userNameElement = document.querySelector('.user-name');
         const userRoleElement = document.querySelector('.user-role');
+        const profileSummary = window.AccessControl?.normalizeUser?.(this.currentUser);
 
-        if (userNameElement) userNameElement.textContent = this.currentUser.nome;
-        if (userRoleElement) userRoleElement.textContent = this.currentUser.perfil === 'NGE' ? 'NGE (Administrador)' : 'Setor/Núcleo';
+        if (userNameElement) userNameElement.textContent = this.currentUser.nome || 'Usuário';
+        if (userRoleElement) userRoleElement.textContent = profileSummary?.profileLabel || (this.currentUser.perfil === 'NGE' ? 'NGE (Administrador)' : 'Setor/Núcleo');
+    }
+
+    normalizeProfile(profile) {
+        return window.AccessControl?.normalizeProfile?.(profile) || (profile === 'NGE_ADMIN' ? 'NGE' : profile);
     }
 
     /**
      * Ajustar abas e menus de acordo com o perfil do usuário
      */
     applyRolePermissions() {
-        const perfil = this.currentUser?.perfil;
+        const normalizedUser = window.AccessControl?.normalizeUser?.(this.currentUser) || this.currentUser;
+        const visibleTabs = window.AccessControl?.getVisibleTabs?.(normalizedUser) || [];
+
         document.querySelectorAll('.nav-item').forEach((item) => {
             item.classList.remove('active');
-        });
-
-        document.querySelectorAll('.nav-item').forEach((item) => {
-            const role = item.dataset.role;
-
-            if (perfil === 'NGE') {
-                if (role === 'SETOR') {
-                    item.classList.add('hidden');
-                } else {
-                    item.classList.remove('hidden');
-                }
-            } else if (perfil === 'SETOR') {
-                if (role === 'NGE') {
-                    item.classList.add('hidden');
-                } else {
-                    item.classList.remove('hidden');
-                }
-            } else {
-                item.classList.add('hidden');
-            }
+            const tab = item.dataset.tab;
+            const allowed = window.AccessControl?.canAccessSection?.(normalizedUser, tab) || visibleTabs.includes(tab);
+            item.classList.toggle('hidden', !allowed);
         });
 
         const allTabs = document.querySelectorAll('.tab-content');
@@ -236,13 +364,9 @@ class SPMApp {
             tab.classList.remove('active');
         });
 
-        if (perfil === 'NGE') {
-            document.getElementById('dashboard-nge')?.classList.add('active');
-            document.querySelector('[data-tab="dashboard-nge"]')?.classList.add('active');
-        } else {
-            document.getElementById('dashboard-setor')?.classList.add('active');
-            document.querySelector('[data-tab="dashboard-setor"]')?.classList.add('active');
-        }
+        const defaultTab = visibleTabs.includes('dashboard-nge') ? 'dashboard-nge' : (visibleTabs.includes('dashboard-setor') ? 'dashboard-setor' : visibleTabs[0] || 'dashboard-setor');
+        document.getElementById(defaultTab)?.classList.add('active');
+        document.querySelector(`[data-tab="${defaultTab}"]`)?.classList.add('active');
     }
 
     /**
@@ -252,14 +376,40 @@ class SPMApp {
         const setorSelect = document.getElementById('setor-select');
         if (!setorSelect) return;
 
-        if (this.currentUser?.perfil === 'SETOR') {
+        const normalizedUser = window.AccessControl?.normalizeUser?.(this.currentUser) || this.currentUser;
+        const canSelectUnit = normalizedUser?.perfil !== 'OPERACIONAL' && normalizedUser?.perfil !== 'CHEFE_SETOR';
+
+        if (!canSelectUnit) {
             setorSelect.innerHTML = `
-                <option value="${this.currentUser.setor_id}">Setor do usuário</option>
+                <option value="${normalizedUser?.unitId || this.currentUser?.setor_id || ''}">Setor do usuário</option>
             `;
-            setorSelect.value = this.currentUser.setor_id;
+            setorSelect.value = normalizedUser?.unitId || this.currentUser?.setor_id || '';
             setorSelect.disabled = true;
         } else {
             setorSelect.disabled = false;
+        }
+    }
+
+    /**
+     * Aplicar perfil de login ao selecionar no menu suspenso
+     */
+    applyLoginProfile(profile) {
+        const emailInput = document.getElementById('email-input');
+        const passwordInput = document.getElementById('password-input');
+
+        if (!emailInput || !passwordInput) {
+            return;
+        }
+
+        switch (profile) {
+            case 'admin':
+                emailInput.value = 'admin@pci.rn.gov.br';
+                passwordInput.value = 'admin123';
+                break;
+            default:
+                emailInput.value = 'admin@pci.rn.gov.br';
+                passwordInput.value = 'admin123';
+                break;
         }
     }
 
@@ -268,13 +418,21 @@ class SPMApp {
      */
     async loadDashboardData() {
         try {
-            ProcessManager.loadProcesses();
-            IndicatorManager.loadIndicators();
+            if (typeof ProcessManager?.loadProcesses === 'function') {
+                ProcessManager.loadProcesses();
+            }
+            if (typeof IndicatorManager?.loadIndicators === 'function') {
+                IndicatorManager.loadIndicators();
+            }
 
-            if (this.currentUser.perfil === 'NGE') {
-                DashboardManager.loadNGEDashboard();
+            if (window.AccessControl?.isNGE?.(this.currentUser)) {
+                if (typeof DashboardManager?.loadNGEDashboard === 'function') {
+                    DashboardManager.loadNGEDashboard();
+                }
             } else {
-                DashboardManager.loadSetorDashboard();
+                if (typeof DashboardManager?.loadSetorDashboard === 'function') {
+                    DashboardManager.loadSetorDashboard();
+                }
             }
         } catch (error) {
             console.error('Erro ao carregar dados do dashboard:', error);
@@ -286,12 +444,11 @@ class SPMApp {
      */
     switchTab(event) {
         const tabName = event.currentTarget.dataset.tab;
-        const role = this.currentUser?.perfil;
-        const allowedTabs = role === 'NGE'
-            ? ['dashboard-nge', 'meus-processos', 'novo-processo', 'monitoramento-bpm', 'indicadores', 'relatorios', 'configuracoes']
-            : ['dashboard-setor', 'meus-processos', 'novo-processo', 'monitoramento-bpm', 'indicadores'];
+        const normalizedUser = window.AccessControl?.normalizeUser?.(this.currentUser) || this.currentUser;
+        const allowedTabs = window.AccessControl?.getVisibleTabs?.(normalizedUser) || [];
 
-        if (!allowedTabs.includes(tabName)) {
+        if (!window.AccessControl?.canAccessSection?.(normalizedUser, tabName) && !allowedTabs.includes(tabName)) {
+            this.showAccessDenied();
             return;
         }
 
@@ -312,28 +469,54 @@ class SPMApp {
         this.loadTabData(tabName);
     }
 
+    showAccessDenied() {
+        const activeTab = document.querySelector('.tab-content.active');
+        const targetTab = document.getElementById('meus-processos') || document.getElementById('dashboard-setor');
+        if (targetTab) {
+            document.querySelectorAll('.tab-content').forEach((tab) => tab.classList.remove('active'));
+            targetTab.classList.add('active');
+            document.querySelectorAll('.nav-item').forEach((item) => item.classList.remove('active'));
+            document.querySelector('[data-tab="meus-processos"]')?.classList.add('active');
+        }
+        if (typeof notificar === 'function') {
+            notificar('Você não possui permissão para acessar esta área.', 'error');
+        }
+    }
+
     /**
      * Carregar dados específicos da aba
      */
     loadTabData(tabName) {
         switch (tabName) {
             case 'dashboard-nge':
-                DashboardManager.loadNGEDashboard();
+                if (typeof DashboardManager?.loadNGEDashboard === 'function') {
+                    DashboardManager.loadNGEDashboard();
+                }
                 break;
             case 'dashboard-setor':
-                DashboardManager.loadSetorDashboard();
+                if (typeof DashboardManager?.loadSetorDashboard === 'function') {
+                    DashboardManager.loadSetorDashboard();
+                }
                 break;
             case 'meus-processos':
-                ProcessManager.loadProcesses();
+                if (typeof ProcessManager?.loadProcesses === 'function') {
+                    ProcessManager.loadProcesses();
+                }
                 break;
             case 'indicadores':
-                IndicatorManager.loadIndicators();
+                if (typeof IndicatorManager?.loadIndicators === 'function') {
+                    IndicatorManager.loadIndicators();
+                }
                 break;
             case 'relatorios':
-                ReportManager.loadReports();
+                if (typeof ReportManager?.loadReports === 'function') {
+                    ReportManager.loadReports();
+                }
                 break;
             case 'configuracoes':
-                SettingsManager.loadSettings();
+                if (typeof SettingsManager?.loadSettings === 'function') {
+                    SettingsManager.loadSettings();
+                }
                 break;
         }
     }
@@ -368,6 +551,95 @@ class SPMApp {
      */
     removeToken() {
         localStorage.removeItem('smp_token');
+    }
+
+    /**
+     * Mostrar modal de recuperação de senha
+     */
+    showForgotPasswordModal() {
+        const modal = document.getElementById('forgot-password-modal');
+        if (modal) {
+            modal.style.display = 'flex';
+            // Reset do modal para step 1
+            document.getElementById('forgot-password-step1').style.display = 'block';
+            document.getElementById('forgot-password-step2').style.display = 'none';
+            document.getElementById('recovery-email-input').value = '';
+        }
+    }
+
+    /**
+     * Enviar email de recuperação
+     */
+    async sendRecoveryEmail() {
+        const email = document.getElementById('recovery-email-input').value.trim();
+
+        if (!email) {
+            alert('Por favor, digite um e-mail válido.');
+            return;
+        }
+
+        try {
+            const result = await api.requestPasswordReset(email);
+            
+            // Mostrar token e link para o dev
+            document.getElementById('recovery-token-display').textContent = `Token: ${result.token}`;
+            document.getElementById('recovery-link-display').textContent = `${window.location.origin}/?reset=${result.token}`;
+            document.getElementById('recovery-link-display').href = `${window.location.origin}/?reset=${result.token}`;
+
+            // Mostrar step 2
+            document.getElementById('forgot-password-step1').style.display = 'none';
+            document.getElementById('forgot-password-step2').style.display = 'block';
+        } catch (error) {
+            alert('Erro ao solicitar recuperação: ' + error.message);
+        }
+    }
+
+    /**
+     * Voltar ao login
+     */
+    backToLogin() {
+        const modal = document.getElementById('forgot-password-modal');
+        const resetSection = document.getElementById('reset-password-section');
+        const loginSection = document.getElementById('login-section');
+
+        if (modal) modal.style.display = 'none';
+        if (resetSection) resetSection.style.display = 'none';
+        if (loginSection) loginSection.style.display = 'block';
+        loginSection.classList.add('active');
+
+        // Reset do formulário
+        const resetForm = document.getElementById('reset-password-form');
+        if (resetForm) resetForm.reset();
+    }
+
+    /**
+     * Redefinir senha
+     */
+    async handleResetPassword(event) {
+        event.preventDefault();
+
+        const token = document.getElementById('reset-token-input').value.trim();
+        const email = document.getElementById('reset-email-input').value.trim();
+        const novaSenha = document.getElementById('reset-new-password-input').value;
+        const confirmaSenha = document.getElementById('reset-confirm-password-input').value;
+
+        if (novaSenha !== confirmaSenha) {
+            alert('As senhas não coincidem!');
+            return;
+        }
+
+        if (novaSenha.length < 6) {
+            alert('A senha deve ter no mínimo 6 caracteres.');
+            return;
+        }
+
+        try {
+            await api.resetPassword(email, token, novaSenha);
+            alert('Senha redefinida com sucesso! Faça login com sua nova senha.');
+            this.backToLogin();
+        } catch (error) {
+            alert('Erro ao redefinir senha: ' + error.message);
+        }
     }
 }
 

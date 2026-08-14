@@ -46,6 +46,9 @@ CREATE TABLE processos (
     data_fim TIMESTAMP,
     responsavel_id INT REFERENCES usuarios(id),
     observacoes TEXT,
+    ativo BOOLEAN DEFAULT TRUE,
+    excluido_em TIMESTAMP,
+    excluido_por INT REFERENCES usuarios(id),
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -140,6 +143,23 @@ CREATE TABLE logs (
     data_acao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Tabela de Unidades Organizacionais
+CREATE TABLE organizational_units (
+    id SERIAL PRIMARY KEY,
+    nome VARCHAR(150) NOT NULL,
+    sigla VARCHAR(50) NOT NULL UNIQUE,
+    tipo VARCHAR(50) NOT NULL CHECK (tipo IN ('DIRETORIA', 'NUCLEO', 'SETOR', 'ASSESSORIA', 'REGIONAL')),
+    unidade_superior_id INT REFERENCES organizational_units(id),
+    setor_legado_id INT UNIQUE REFERENCES setores(id),
+    ativo BOOLEAN DEFAULT TRUE,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_organizational_units_unidade_superior ON organizational_units(unidade_superior_id);
+CREATE INDEX idx_organizational_units_tipo ON organizational_units(tipo);
+CREATE INDEX idx_organizational_units_ativo ON organizational_units(ativo);
+
 -- Tabela de Alertas
 CREATE TABLE alertas (
     id SERIAL PRIMARY KEY,
@@ -224,6 +244,9 @@ CREATE TRIGGER trigger_processos_timestamp BEFORE UPDATE ON processos
     FOR EACH ROW EXECUTE FUNCTION atualizar_timestamp();
 
 CREATE TRIGGER trigger_indicadores_timestamp BEFORE UPDATE ON indicadores
+    FOR EACH ROW EXECUTE FUNCTION atualizar_timestamp();
+
+CREATE TRIGGER trigger_organizational_units_timestamp BEFORE UPDATE ON organizational_units
     FOR EACH ROW EXECUTE FUNCTION atualizar_timestamp();
 
 -- ============================================================================

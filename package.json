@@ -9,7 +9,8 @@
     "test": "node --test test/functional/*.test.js",
     "test:roles": "node test/functional/role-access.test.js",
     "test:security": "node --test test/functional/security-auth.test.js",
-    "test:integration": "node --test test/functional/postgresql-integration.test.js"
+    "test:integration": "node --test test/functional/postgresql-integration.test.js",
+    "test:organizational-units": "node --test test/functional/organizational-units-postgresql.test.js"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -31,6 +32,7 @@
     "helmet": "^8.2.0",
     "jsonwebtoken": "^9.0.0",
     "multer": "^1.4.5-lts.1",
+    "pdfkit": "^0.19.1",
     "pg": "^8.10.0"
   },
   "devDependencies": {
