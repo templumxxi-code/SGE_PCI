@@ -49,6 +49,8 @@
 .fa-save::before { content: "💾 "; }
 .fa-lightbulb::before { content: "💡 "; }
 .fa-microscope::before { content: "🔬 "; }
+.fa-hammer::before { content: "🔨 "; }
+.fa-rocket::before { content: "🚀 "; }
 .fa-inbox::before { content: "📥 "; }
 .fa-check::before { content: "✓ "; }
 .fa-trash::before { content: "🗑 "; }

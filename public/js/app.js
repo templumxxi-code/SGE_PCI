@@ -2,6 +2,14 @@
 // SMP PCI - Aplicação Principal
 // ============================================================================
 
+const APP_INFO = {
+    name: 'SGE PCI/RN',
+    fullName: 'Sistema de Gestão Estratégica',
+    version: '1.0.0',
+    developer: 'Núcleo de Gestão Estratégica — NGE',
+    institution: 'Polícia Científica do Rio Grande do Norte'
+};
+
 class SPMApp {
     constructor() {
         this.currentUser = null;
@@ -42,9 +50,46 @@ class SPMApp {
      */
     init() {
         this.setupEventListeners();
+        this.updateAppVersion();
         this.checkEnvironment();
         this.checkResetPasswordFlow();
         this.checkAuthentication();
+    }
+
+    updateAppVersion() {
+        const versionLabel = document.getElementById('app-version-label');
+        if (versionLabel) {
+            versionLabel.textContent = `${APP_INFO.name} — Versão ${APP_INFO.version}`;
+        }
+    }
+
+    setFieldError(fieldId, message) {
+        const field = document.getElementById(fieldId);
+        const errorField = field ? field.closest('.form-group')?.querySelector('.field-message') : null;
+        if (!field || !errorField) return;
+
+        field.setAttribute('aria-invalid', message ? 'true' : 'false');
+        errorField.textContent = message || '';
+        errorField.classList.toggle('is-visible', Boolean(message));
+    }
+
+    clearFieldErrors() {
+        this.setFieldError('email-input', '');
+        this.setFieldError('password-input', '');
+        const alert = document.getElementById('login-error-message');
+        if (alert) {
+            alert.textContent = '';
+            alert.classList.remove('visible');
+        }
+    }
+
+    setLoginButtonState(isLoading) {
+        const button = document.getElementById('login-submit-btn');
+        if (!button) return;
+
+        button.disabled = isLoading;
+        button.textContent = isLoading ? 'Entrando...' : 'Entrar';
+        button.setAttribute('aria-busy', String(isLoading));
     }
 
     async checkEnvironment() {
@@ -149,9 +194,17 @@ class SPMApp {
             loginForm.addEventListener('submit', (e) => this.handleLogin(e));
         }
 
-        const loginProfileSelect = document.getElementById('login-profile-select');
-        if (loginProfileSelect) {
-            loginProfileSelect.addEventListener('change', () => this.applyLoginProfile(loginProfileSelect.value));
+        const togglePasswordBtn = document.getElementById('btn-toggle-password');
+        const passwordInput = document.getElementById('password-input');
+        if (togglePasswordBtn && passwordInput) {
+            togglePasswordBtn.addEventListener('click', () => {
+                const isPassword = passwordInput.type === 'password';
+                passwordInput.type = isPassword ? 'text' : 'password';
+                togglePasswordBtn.setAttribute('aria-label', isPassword ? 'Ocultar senha' : 'Mostrar senha');
+                togglePasswordBtn.setAttribute('aria-pressed', String(isPassword));
+                togglePasswordBtn.textContent = isPassword ? '🙈' : '👁';
+                passwordInput.focus();
+            });
         }
 
         // Header search box (sync with process list filter)
@@ -165,15 +218,6 @@ class SPMApp {
                     if (typeof ProcessManager?.renderProcesses === 'function') {
                         ProcessManager.renderProcesses(ProcessManager.getStoredProcesses());
                     }
-                }
-            });
-        }
-
-        const notificationButton = document.querySelector('.btn-notification');
-        if (notificationButton) {
-            notificationButton.addEventListener('click', () => {
-                if (typeof notificar === 'function') {
-                    notificar('Notificações não implementadas no momento.', 'info');
                 }
             });
         }
@@ -252,8 +296,33 @@ class SPMApp {
     async handleLogin(event) {
         event.preventDefault();
 
-        const email = document.getElementById('email-input').value;
-        const senha = document.getElementById('password-input').value;
+        const emailInput = document.getElementById('email-input');
+        const passwordInput = document.getElementById('password-input');
+        const email = (emailInput?.value || '').trim();
+        const senha = passwordInput?.value || '';
+
+        this.clearFieldErrors();
+
+        if (!email) {
+            this.setFieldError('email-input', 'Informe seu e-mail institucional.');
+            emailInput?.focus();
+            return;
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            this.setFieldError('email-input', 'Informe um e-mail válido.');
+            emailInput?.focus();
+            return;
+        }
+
+        if (!senha) {
+            this.setFieldError('password-input', 'Informe sua senha.');
+            passwordInput?.focus();
+            return;
+        }
+
+        this.setLoginButtonState(true);
 
         try {
             const response = await fetch(`${this.apiUrl}/auth/login`, {
@@ -277,14 +346,30 @@ class SPMApp {
             }
 
             const error = await response.json().catch(() => ({}));
-            alert('Erro no login: ' + (error.error || 'Credenciais inválidas'));
+            const message = String(error.error || 'E-mail ou senha inválidos.');
+            const lowerMessage = message.toLowerCase();
+
+            if (lowerMessage.includes('inativo') || lowerMessage.includes('ativo')) {
+                this.setFieldError('password-input', 'Este usuário está inativo. Entre em contato com o administrador do sistema.');
+            } else {
+                const alert = document.getElementById('login-error-message');
+                if (alert) {
+                    alert.textContent = 'E-mail ou senha inválidos.';
+                    alert.classList.add('visible');
+                }
+                this.setFieldError('password-input', 'E-mail ou senha inválidos.');
+            }
         } catch (error) {
             console.error('Erro ao fazer login:', error);
-            if (this.isRunningFromFile()) {
-                alert('Não foi possível conectar à API. Abra a aplicação via servidor local, por exemplo: npm run dev e acesse http://localhost:3000');
-            } else {
-                alert('Erro na comunicação com o servidor. Verifique se o backend está ativo em http://localhost:3000');
+            const alert = document.getElementById('login-error-message');
+            if (alert) {
+                alert.textContent = this.isRunningFromFile()
+                    ? 'Não foi possível conectar ao servidor. Abra a aplicação em http://localhost:3000.'
+                    : 'Não foi possível concluir o login. Verifique a conexão com o servidor.';
+                alert.classList.add('visible');
             }
+        } finally {
+            this.setLoginButtonState(false);
         }
     }
 
@@ -297,6 +382,9 @@ class SPMApp {
         this.isAuthenticated = false;
         window.AccessControl?.saveCurrentUser?.(null);
         localStorage.removeItem('sge_pci_current_user');
+        if (window.NotificationCenter?.closeNotificationDropdown) {
+            window.NotificationCenter.closeNotificationDropdown();
+        }
 
         const loginSection = document.getElementById('login-section');
         const dashboardSection = document.getElementById('dashboard-section');
@@ -304,6 +392,9 @@ class SPMApp {
         loginSection.classList.add('active');
         dashboardSection.classList.remove('active');
         document.getElementById('login-form').reset();
+        if (window.NotificationCenter?.renderNotificationBadge) {
+            window.NotificationCenter.renderNotificationBadge();
+        }
     }
 
     /**
@@ -319,6 +410,9 @@ class SPMApp {
         // Atualizar informações do usuário
         this.updateUserInfo();
         window.AccessControl?.saveCurrentUser?.(this.currentUser);
+        if (window.NotificationCenter?.initNotificationCenter) {
+            window.NotificationCenter.initNotificationCenter();
+        }
 
         // Ajustar navegação e abas conforme perfil
         this.applyRolePermissions();
@@ -387,29 +481,6 @@ class SPMApp {
             setorSelect.disabled = true;
         } else {
             setorSelect.disabled = false;
-        }
-    }
-
-    /**
-     * Aplicar perfil de login ao selecionar no menu suspenso
-     */
-    applyLoginProfile(profile) {
-        const emailInput = document.getElementById('email-input');
-        const passwordInput = document.getElementById('password-input');
-
-        if (!emailInput || !passwordInput) {
-            return;
-        }
-
-        switch (profile) {
-            case 'admin':
-                emailInput.value = 'admin@pci.rn.gov.br';
-                passwordInput.value = 'admin123';
-                break;
-            default:
-                emailInput.value = 'admin@pci.rn.gov.br';
-                passwordInput.value = 'admin123';
-                break;
         }
     }
 
@@ -643,7 +714,442 @@ class SPMApp {
     }
 }
 
+const NotificationCenter = {
+    storageKey: 'sge_pci_notifications',
+    filter: 'ALL',
+    initialized: false,
+    allowedEvents: [
+        'PROCESSO_CRIADO',
+        'PROCESSO_SUBMETIDO',
+        'ATIVIDADE_SUBMETIDA',
+        'ATIVIDADE_AVANCADA',
+        'PROCESSO_APROVADO',
+        'PROCESSO_DEVOLVIDO',
+        'PROCESSO_HOMOLOGADO',
+        'PROCESSO_ARQUIVADO',
+        'INDICADOR_CADASTRADO',
+        'CONTRA_MEDIDA_CADASTRADA',
+        'USUARIO_CRIADO',
+        'USUARIO_ATUALIZADO',
+        'USUARIO_INATIVADO',
+        'PRAZO_VENCIDO',
+        'SISTEMA'
+    ],
+
+    normalizeNotification(item) {
+        if (!item || typeof item !== 'object') return null;
+        const normalized = { ...item };
+        normalized.id = normalized.id || `notification-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        normalized.category = normalized.category || 'SYSTEM';
+        normalized.priority = normalized.priority || 'INFO';
+        normalized.read = Boolean(normalized.read);
+        normalized.archived = Boolean(normalized.archived);
+        normalized.createdAt = normalized.createdAt || new Date().toISOString();
+        normalized.readAt = normalized.readAt || null;
+        normalized.sourceEvent = normalized.sourceEvent || normalized.eventType || 'SISTEMA';
+        return normalized;
+    },
+
+    loadNotifications() {
+        try {
+            const raw = localStorage.getItem(this.storageKey);
+            const list = raw ? JSON.parse(raw) : [];
+            return Array.isArray(list) ? list.map((item) => this.normalizeNotification(item)).filter(Boolean) : [];
+        } catch (error) {
+            return [];
+        }
+    },
+
+    saveNotifications(items) {
+        localStorage.setItem(this.storageKey, JSON.stringify((Array.isArray(items) ? items : []).map((item) => this.normalizeNotification(item)).filter(Boolean)));
+    },
+
+    notificationExists(dedupKey) {
+        if (!dedupKey) return false;
+        return this.loadNotifications().some((notification) => String(notification.dedupKey || '') === String(dedupKey));
+    },
+
+    getCurrentUser() {
+        return window.app?.currentUser || window.AccessControl?.getCurrentUser?.() || null;
+    },
+
+    isKnownEventSource(sourceEvent) {
+        return this.allowedEvents.includes(String(sourceEvent || '').trim().toUpperCase());
+    },
+
+    resolveCategoryFromEvent(eventType) {
+        const type = String(eventType || '').trim().toUpperCase();
+        if (type.includes('APROV')) return 'APPROVAL';
+        if (type.includes('PRAZO') || type.includes('ALERT')) return 'ALERT';
+        if (type.includes('INDICADOR') || type.includes('CONTRA') || type.includes('USUARIO') || type.includes('PROCESSO')) return 'UPDATE';
+        return 'SYSTEM';
+    },
+
+    createNotification(payload = {}) {
+        const safePayload = { ...payload };
+        const sourceEvent = String(safePayload.sourceEvent || safePayload.eventType || 'SISTEMA').trim().toUpperCase();
+        if (!this.isKnownEventSource(sourceEvent)) {
+            return null;
+        }
+
+        const dedupKey = safePayload.dedupKey || [
+            sourceEvent,
+            safePayload.processId || '',
+            safePayload.recipientUserId || safePayload.targetUserId || '',
+            safePayload.entityId || safePayload.targetProcessId || safePayload.indicatorId || '',
+            safePayload.createdAt || new Date().toISOString()
+        ].join(':');
+
+        if (this.notificationExists(dedupKey)) {
+            return null;
+        }
+
+        const normalized = this.normalizeNotification({
+            ...safePayload,
+            id: safePayload.id || `notification-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            recipientUserId: safePayload.recipientUserId || null,
+            recipientRole: safePayload.recipientRole || null,
+            organizationType: safePayload.organizationType || null,
+            organizationUnitId: safePayload.organizationUnitId || null,
+            instituteId: safePayload.instituteId || null,
+            regionalId: safePayload.regionalId || null,
+            advisoryId: safePayload.advisoryId || null,
+            nucleusId: safePayload.nucleusId || null,
+            sectorId: safePayload.sectorId || null,
+            processId: safePayload.processId || null,
+            indicatorId: safePayload.indicatorId || null,
+            phaseCode: safePayload.phaseCode || null,
+            activityCode: safePayload.activityCode || null,
+            category: this.resolveCategoryFromEvent(sourceEvent),
+            priority: safePayload.priority || 'INFO',
+            title: safePayload.title || 'Notificação',
+            message: safePayload.message || '',
+            read: Boolean(safePayload.read),
+            archived: Boolean(safePayload.archived),
+            targetSection: safePayload.targetSection || null,
+            targetProcessId: safePayload.targetProcessId || safePayload.processId || null,
+            targetPhaseCode: safePayload.targetPhaseCode || safePayload.phaseCode || null,
+            targetActivityCode: safePayload.targetActivityCode || safePayload.activityCode || null,
+            targetIndicatorId: safePayload.targetIndicatorId || safePayload.indicatorId || null,
+            createdAt: safePayload.createdAt || new Date().toISOString(),
+            readAt: safePayload.readAt || null,
+            dedupKey,
+            eventType: sourceEvent,
+            sourceEvent
+        });
+
+        const all = this.loadNotifications();
+        all.unshift(normalized);
+        this.saveNotifications(all);
+        return normalized;
+    },
+
+    emitNotification(eventType, payload = {}) {
+        const sourceEvent = String(payload.sourceEvent || eventType || '').trim().toUpperCase();
+        if (!this.isKnownEventSource(sourceEvent)) {
+            return null;
+        }
+
+        const currentUser = payload.currentUser || this.getCurrentUser();
+        const userProfile = currentUser ? (window.AccessControl?.normalizeUser?.(currentUser) || currentUser) : null;
+        const item = this.createNotification({
+            ...payload,
+            sourceEvent,
+            eventType: sourceEvent,
+            category: payload.category || this.resolveCategoryFromEvent(sourceEvent),
+            recipientUserId: payload.recipientUserId || (currentUser ? currentUser.id : null),
+            recipientRole: payload.recipientRole || (userProfile ? userProfile.accessProfileKey || userProfile.perfil : null),
+            read: Boolean(payload.read),
+            archived: Boolean(payload.archived),
+            createdAt: payload.createdAt || new Date().toISOString(),
+            dedupKey: payload.dedupKey || [
+                sourceEvent,
+                payload.processId || '',
+                payload.recipientUserId || (currentUser ? currentUser.id : ''),
+                payload.entityId || payload.targetProcessId || payload.indicatorId || '',
+                payload.createdAt || new Date().toISOString()
+            ].join(':')
+        });
+
+        this.renderNotificationBadge();
+        return item;
+    },
+
+    canUserReceiveNotification(user, notification) {
+        if (!user || !notification) return false;
+        const normalizedUser = window.AccessControl?.normalizeUser?.(user) || user;
+        if (String(normalizedUser.accessProfileKey || normalizedUser.perfil || '').toUpperCase() === 'NGE_ADMIN') {
+            return !notification.archived;
+        }
+
+        if (notification.recipientUserId && String(notification.recipientUserId) !== String(normalizedUser.id)) {
+            return false;
+        }
+
+        if (notification.recipientRole && String(notification.recipientRole).toUpperCase() !== String(normalizedUser.accessProfileKey || normalizedUser.perfil || '').toUpperCase()) {
+            return false;
+        }
+
+        if (notification.processId) {
+            const processList = JSON.parse(localStorage.getItem('sge_pci_processos') || '[]');
+            const process = Array.isArray(processList) ? processList.find((item) => String(item.id) === String(notification.processId)) : null;
+            if (process && window.AccessControl?.canViewProcess && !window.AccessControl.canViewProcess(normalizedUser, process)) {
+                return false;
+            }
+        }
+
+        if (notification.instituteId && normalizedUser.instituteId && String(normalizedUser.instituteId) !== String(notification.instituteId)) {
+            return false;
+        }
+        if (notification.regionalId && normalizedUser.regionalId && String(normalizedUser.regionalId) !== String(notification.regionalId)) {
+            return false;
+        }
+        if (notification.advisoryId && normalizedUser.advisoryId && String(normalizedUser.advisoryId) !== String(notification.advisoryId)) {
+            return false;
+        }
+        if (notification.nucleusId && normalizedUser.nucleusId && String(normalizedUser.nucleusId) !== String(notification.nucleusId)) {
+            return false;
+        }
+        if (notification.sectorId && normalizedUser.sectorId && String(normalizedUser.sectorId) !== String(notification.sectorId)) {
+            return false;
+        }
+
+        return !notification.archived;
+    },
+
+    getNotificationsForUser(user = this.getCurrentUser()) {
+        const currentUser = user || this.getCurrentUser();
+        if (!currentUser) return [];
+        return this.loadNotifications().filter((notification) => this.canUserReceiveNotification(currentUser, notification));
+    },
+
+    getVisibleNotifications() {
+        return this.getNotificationsForUser(this.getCurrentUser());
+    },
+
+    getUnreadNotificationCount(user = this.getCurrentUser()) {
+        return this.getNotificationsForUser(user).filter((notification) => !notification.read).length;
+    },
+
+    getPriorityLabel(priority) {
+        const labels = { CRITICAL: 'Crítica', WARNING: 'Atenção', INFO: 'Informativa', SUCCESS: 'Sucesso' };
+        return labels[String(priority || 'INFO').toUpperCase()] || 'Informativa';
+    },
+
+    getCategoryLabel(category) {
+        const labels = { APPROVAL: 'Aprovações', ALERT: 'Alertas', UPDATE: 'Atualizações', SYSTEM: 'Sistema' };
+        return labels[String(category || 'SYSTEM').toUpperCase()] || 'Sistema';
+    },
+
+    formatRelativeTime(dateString) {
+        if (!dateString) return 'agora';
+        const diffMs = Date.now() - new Date(dateString).getTime();
+        const diffMinutes = Math.max(0, Math.round(diffMs / 60000));
+        if (diffMinutes < 1) return 'agora';
+        if (diffMinutes < 60) return `há ${diffMinutes} min`;
+        const diffHours = Math.round(diffMinutes / 60);
+        if (diffHours < 24) return `há ${diffHours} h`;
+        const diffDays = Math.round(diffHours / 24);
+        return `há ${diffDays} dia(s)`;
+    },
+
+    renderNotificationBadge() {
+        const badge = document.querySelector('.notification-badge');
+        const button = document.querySelector('.btn-notification');
+        const count = this.getUnreadNotificationCount();
+        if (!badge || !button) return;
+
+        const display = count > 99 ? '99+' : String(count);
+        badge.textContent = display;
+        badge.classList.toggle('visible', count > 0);
+        badge.setAttribute('aria-label', `${count} notificações não lidas`);
+        button.setAttribute('aria-label', `Notificações, ${count} não lidas`);
+    },
+
+    filterNotifications(notifications, filter = this.filter) {
+        if (!Array.isArray(notifications)) return [];
+        const activeFilter = filter || 'ALL';
+        if (activeFilter === 'ALL') return notifications;
+        if (activeFilter === 'UNREAD') return notifications.filter((item) => !item.read);
+        if (activeFilter === 'READ') return notifications.filter((item) => item.read);
+        return notifications.filter((item) => String(item.category).toUpperCase() === String(activeFilter).toUpperCase());
+    },
+
+    renderNotificationDropdown() {
+        const dropdown = document.getElementById('notification-dropdown');
+        const currentUser = this.getCurrentUser();
+        if (!dropdown) return;
+
+        const notifications = this.getNotificationsForUser(currentUser).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        const visible = this.filterNotifications(notifications, this.filter);
+
+        dropdown.innerHTML = `
+            <div class="notification-header">
+                <h3>Notificações</h3>
+                <div class="notification-filters">
+                    <button type="button" class="notification-filter-btn ${this.filter === 'ALL' ? 'active' : ''}" data-filter="ALL">Todas</button>
+                    <button type="button" class="notification-filter-btn ${this.filter === 'UNREAD' ? 'active' : ''}" data-filter="UNREAD">Não lidas</button>
+                    <button type="button" class="notification-filter-btn ${this.filter === 'APPROVAL' ? 'active' : ''}" data-filter="APPROVAL">Aprovações</button>
+                    <button type="button" class="notification-filter-btn ${this.filter === 'ALERT' ? 'active' : ''}" data-filter="ALERT">Alertas</button>
+                    <button type="button" class="notification-filter-btn ${this.filter === 'UPDATE' ? 'active' : ''}" data-filter="UPDATE">Atualizações</button>
+                    <button type="button" class="notification-filter-btn ${this.filter === 'SYSTEM' ? 'active' : ''}" data-filter="SYSTEM">Sistema</button>
+                </div>
+            </div>
+            <div class="notification-list">
+                ${visible.length ? visible.map((notification) => `
+                    <div class="notification-item ${notification.read ? '' : 'unread'}" data-id="${notification.id}" tabindex="0" role="button" aria-label="Abrir notificação: ${notification.title}">
+                        <div class="notification-icon">${notification.priority === 'CRITICAL' ? '🔴' : notification.priority === 'WARNING' ? '🟠' : notification.priority === 'SUCCESS' ? '🟢' : '🔵'}</div>
+                        <div class="notification-body">
+                            <div class="notification-title">${this.getCategoryLabel(notification.category)}</div>
+                            <div class="notification-message">${notification.title}</div>
+                            <div class="notification-meta">${notification.message} · ${this.formatRelativeTime(notification.createdAt)}</div>
+                        </div>
+                        <div class="notification-priority priority-${notification.priority || 'INFO'}">${this.getPriorityLabel(notification.priority)}</div>
+                    </div>
+                `).join('') : '<div class="notification-empty">Nenhuma notificação para este escopo.</div>'}
+            </div>
+            <div class="notification-footer">
+                <button type="button" data-action="mark-all-read">Marcar todas como lidas</button>
+                <button type="button" data-action="close-notifications">Fechar</button>
+            </div>
+        `;
+
+        dropdown.querySelectorAll('[data-filter]').forEach((button) => {
+            button.addEventListener('click', (event) => {
+                this.filter = event.currentTarget.dataset.filter || 'ALL';
+                this.renderNotificationDropdown();
+            });
+        });
+
+        dropdown.querySelectorAll('.notification-item').forEach((item) => {
+            item.addEventListener('click', () => {
+                const id = item.dataset.id;
+                if (id) {
+                    this.markNotificationAsRead(id);
+                    this.openNotificationTarget(this.loadNotifications().find((notification) => notification.id === id));
+                }
+            });
+        });
+
+        dropdown.querySelector('[data-action="mark-all-read"]').addEventListener('click', () => this.markAllNotificationsAsRead());
+        dropdown.querySelector('[data-action="close-notifications"]').addEventListener('click', () => this.closeNotificationDropdown());
+    },
+
+    markNotificationAsRead(notificationId) {
+        const list = this.loadNotifications();
+        const updated = list.map((notification) => (
+            notification.id === notificationId ? { ...notification, read: true, readAt: new Date().toISOString() } : notification
+        ));
+        this.saveNotifications(updated);
+        this.renderNotificationBadge();
+        this.renderNotificationDropdown();
+    },
+
+    markAllNotificationsAsRead() {
+        const currentUser = this.getCurrentUser();
+        const notifications = this.getNotificationsForUser(currentUser).map((notification) => ({ ...notification, read: true, readAt: new Date().toISOString() }));
+        const all = this.loadNotifications().map((notification) => {
+            const match = notifications.find((item) => item.id === notification.id);
+            return match || notification;
+        });
+        this.saveNotifications(all);
+        this.renderNotificationBadge();
+        this.renderNotificationDropdown();
+    },
+
+    openNotificationTarget(notification) {
+        if (!notification) return;
+        if (notification.targetSection) {
+            const targetTabButton = document.querySelector(`[data-tab="${notification.targetSection}"]`);
+            if (targetTabButton) {
+                targetTabButton.click();
+            }
+        }
+
+        if (notification.targetProcessId) {
+            const tabButton = document.querySelector('[data-tab="meus-processos"]');
+            if (tabButton) {
+                tabButton.click();
+            }
+            setTimeout(() => {
+                if (typeof ProcessManager?.selectActivity === 'function' && notification.targetPhaseCode && notification.targetActivityCode) {
+                    ProcessManager.selectActivity(notification.targetProcessId, notification.targetPhaseCode, notification.targetActivityCode);
+                } else if (typeof ProcessManager?.renderProcesses === 'function') {
+                    ProcessManager.renderProcesses(ProcessManager.getStoredProcesses());
+                }
+            }, 200);
+        }
+
+        if (notification.targetIndicatorId) {
+            const tabButton = document.querySelector('[data-tab="indicadores"]');
+            if (tabButton) {
+                tabButton.click();
+            }
+        }
+    },
+
+    closeNotificationDropdown() {
+        const dropdown = document.getElementById('notification-dropdown');
+        const bell = document.querySelector('.btn-notification');
+        if (dropdown) {
+            dropdown.classList.add('hidden');
+        }
+        if (bell) {
+            bell.setAttribute('aria-expanded', 'false');
+        }
+    },
+
+    toggleNotificationDropdown() {
+        const dropdown = document.getElementById('notification-dropdown');
+        const bell = document.querySelector('.btn-notification');
+        if (!dropdown || !bell) return;
+        const willOpen = dropdown.classList.contains('hidden');
+        dropdown.classList.toggle('hidden', !willOpen);
+        bell.setAttribute('aria-expanded', String(willOpen));
+        if (willOpen) {
+            this.renderNotificationDropdown();
+        }
+    },
+
+    initNotificationCenter() {
+        if (this.initialized) {
+            this.renderNotificationBadge();
+            return;
+        }
+
+        this.initialized = true;
+        const bell = document.querySelector('.btn-notification');
+        if (!bell) return;
+
+        bell.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this.toggleNotificationDropdown();
+        });
+
+        document.addEventListener('click', (event) => {
+            const dropdown = document.getElementById('notification-dropdown');
+            const bellButton = document.querySelector('.btn-notification');
+            if (dropdown && !dropdown.contains(event.target) && !bellButton?.contains(event.target)) {
+                this.closeNotificationDropdown();
+            }
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                this.closeNotificationDropdown();
+            }
+        });
+
+        this.renderNotificationBadge();
+    }
+};
+
+window.NotificationCenter = NotificationCenter;
+
 // Inicializar aplicação quando o DOM estiver pronto
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new SPMApp();
+    if (window.NotificationCenter?.initNotificationCenter) {
+        window.NotificationCenter.initNotificationCenter();
+    }
 });

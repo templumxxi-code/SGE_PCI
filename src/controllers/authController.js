@@ -17,9 +17,10 @@ const createAuthError = (message, statusCode = 401) => {
  * Login do usuário
  * @param {string} email
  * @param {string} senha
+ * @param {string} perfil (opcional)
  * @returns {Promise}
  */
-const login = async (email, senha) => {
+const login = async (email, senha, perfilSolicitado = null) => {
     try {
         const emailNormalizado = String(email || '').trim().toLowerCase();
         const senhaInformada = String(senha || '');
@@ -38,7 +39,22 @@ const login = async (email, senha) => {
             throw createAuthError('Credenciais inválidas.');
         }
 
-        const perfilNormalizado = normalizePerfil(usuario.perfil || usuario.role);
+        // Se um perfil foi solicitado, validar se o usuário tem esse perfil
+        let perfilNormalizado = normalizePerfil(usuario.perfil || usuario.role);
+        
+        if (perfilSolicitado) {
+            const perfilSolicitadoNormalizado = normalizePerfil(perfilSolicitado);
+            const perfisDoUsuario = usuario.perfis || [usuario.perfil || usuario.role];
+            
+            // Verificar se o perfil solicitado está na lista de perfis do usuário
+            const temPerfilSolicitado = perfisDoUsuario.some(p => normalizePerfil(p) === perfilSolicitadoNormalizado);
+            
+            if (!temPerfilSolicitado) {
+                throw createAuthError('Perfil não disponível para este usuário.');
+            }
+            
+            perfilNormalizado = perfilSolicitadoNormalizado;
+        }
 
         const token = jwt.sign(
             {
@@ -85,14 +101,23 @@ const login = async (email, senha) => {
  */
 const registrar = async (userData) => {
     try {
-        const { nome, email, senha, perfil, setor_id, registration, organizationType, organizationUnitId, instituteId, regionalId, advisoryId, nucleusId, sectorId, active, observations } = userData;
+        const { nome, email, senha, perfil, perfis, setor_id, registration, organizationType, organizationUnitId, instituteId, regionalId, advisoryId, nucleusId, sectorId, active, observations } = userData;
 
-        if (!nome || !email || !senha || !perfil) {
+        if (!nome || !email || !senha) {
             throw new Error('Campos obrigatórios não preenchidos');
         }
 
-        const perfilNormalizado = normalizePerfil(perfil);
-        if (!isProfileAllowed(perfilNormalizado, ['NGE', 'DIRETOR_INSTITUTO', 'SUBCOORDENADOR_REGIONAL', 'SUBCOORDENADOR_INSTITUTO', 'ASSESSOR', 'CHEFE_NUCLEO', 'CHEFE_SETOR', 'OPERACIONAL'])) {
+        const perfisSelecionados = Array.isArray(perfis) && perfis.length > 0 ? perfis : (perfil ? [perfil] : []);
+        if (perfisSelecionados.length === 0) {
+            throw new Error('Selecione pelo menos um perfil');
+        }
+
+        const perfisNormalizados = perfisSelecionados.map((item) => normalizePerfil(item)).filter(Boolean);
+        const perfilPrincipal = perfisNormalizados[0];
+
+        const allowedProfiles = ['NGE', 'DIRETOR_INSTITUTO', 'SUBCOORDENADOR_REGIONAL', 'SUBCOORDENADOR_INSTITUTO', 'SUBCOORDENADOR_FINANCEIRA', 'SUBCOORDENADOR_ADMINISTRATIVA', 'ASSESSOR', 'CHEFE_NUCLEO', 'CHEFE_SETOR', 'OPERACIONAL'];
+        const perfisValidos = perfisNormalizados.every((item) => isProfileAllowed(item, allowedProfiles));
+        if (!perfisValidos || !perfilPrincipal) {
             throw new Error('Perfil inválido');
         }
 
@@ -111,8 +136,9 @@ const registrar = async (userData) => {
             registration,
             email,
             senha,
-            perfil: perfilNormalizado,
-            role: perfilNormalizado,
+            perfis: perfisNormalizados,
+            perfil: perfilPrincipal,
+            role: perfilPrincipal,
             organizationType,
             organizationUnitId,
             instituteId,
@@ -144,6 +170,20 @@ const listarUsuarios = async () => {
     } catch (error) {
         throw error;
     }
+};
+
+/**
+ * Listar somente os dados necessários para o seletor de login.
+ */
+const listarOpcoesLogin = async () => {
+    return listUsers()
+        .filter((usuario) => usuario.active !== false)
+        .map((usuario) => ({
+            id: usuario.id,
+            nome: usuario.nome,
+            email: usuario.email,
+            perfil: normalizePerfil(usuario.perfil)
+        }));
 };
 
 /**
@@ -259,6 +299,39 @@ const deletarUsuario = async (usuarioId) => {
 };
 
 /**
+ * Obter perfis disponíveis para um email
+ * @param {string} email
+ * @returns {Promise}
+ */
+const obterPerfisDisponíveis = async (email) => {
+    try {
+        const emailNormalizado = String(email || '').trim().toLowerCase();
+        const usuario = await findUserByEmail(emailNormalizado);
+
+        if (!usuario || !usuario.active) {
+            return { perfis: [], encontrado: false };
+        }
+
+        // Retornar os perfis do usuário
+        const perfis = usuario.perfis || [usuario.perfil || 'OPERACIONAL'];
+        return {
+            perfis: perfis.map((p) => ({
+                id: p,
+                nome: normalizePerfil(p)
+            })),
+            encontrado: true,
+            usuario: {
+                id: usuario.id,
+                nome: usuario.nome,
+                email: usuario.email
+            }
+        };
+    } catch (error) {
+        return { perfis: [], encontrado: false, erro: error.message };
+    }
+};
+
+/**
  * Atualizar status do usuário
  * @param {number} usuarioId
  * @param {boolean} active
@@ -284,9 +357,11 @@ module.exports = {
     login,
     registrar,
     listarUsuarios,
+    listarOpcoesLogin,
     obterUsuario,
     atualizarUsuario,
     alterarSenha,
     deletarUsuario,
+    obterPerfisDisponíveis,
     atualizarStatusUsuario
 };

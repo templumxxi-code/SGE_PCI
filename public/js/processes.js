@@ -65,8 +65,8 @@ class ProcessManager {
     ];
 
     static ACTIVITY_DISPLAY_TITLES = {
-        PLAN_A: 'A) Estabelecer objetivo do Projeto de Melhoria',
-        PLAN_B: 'B) Definir equipe de melhoria',
+        PLAN_A: 'A) Definir equipe de melhoria',
+        PLAN_B: 'B) Estabelecer objetivo do Projeto de Melhoria',
         PLAN_C: 'C) Solicitar documentação existente do processo',
         PLAN_D: 'D) Diagrama de Escopo e Interface — DEIP',
         PLAN_E: 'E) Elaborar Plano de Projeto com todas as informações adquiridas (Referente à etapa E e F do Manual)',
@@ -3181,8 +3181,8 @@ class ProcessManager {
 
         return [
             phaseTemplate('Planejar', [
-                { code: 'PLAN_A', title: 'A) Estabelecer objetivo do Projeto de Melhoria', content: {}, attachments: [], team: [] },
-                { code: 'PLAN_B', title: 'B) Definir equipe de melhoria', content: {}, attachments: [], team: [] },
+                { code: 'PLAN_A', title: 'A) Definir equipe de melhoria', content: {}, attachments: [], team: [] },
+                { code: 'PLAN_B', title: 'B) Estabelecer objetivo do Projeto de Melhoria', content: {}, attachments: [], team: [] },
                 { code: 'PLAN_C', title: 'C) Solicitar documentação existente do processo', content: {}, attachments: [] },
                 { code: 'PLAN_D', title: 'D) Diagrama de Escopo e Interface — DEIP', content: {}, attachments: [] },
                 { code: 'PLAN_E', title: 'E) Elaborar Plano de Projeto com todas as informações adquiridas (Referente à etapa E e F do Manual)', content: {}, attachments: [] },
@@ -3608,6 +3608,9 @@ class ProcessManager {
                 window.DashboardManager.loadNGEDashboard();
             }
         }
+        if (typeof window !== 'undefined' && window.BPMDetailsModule?.updateOnUserChange) {
+            window.BPMDetailsModule.updateOnUserChange();
+        }
 
         notificar('Atividade salva com sucesso.', 'success');
         return true;
@@ -3687,6 +3690,9 @@ class ProcessManager {
             if (typeof window.DashboardManager.loadNGEDashboard === 'function') {
                 window.DashboardManager.loadNGEDashboard();
             }
+        }
+        if (typeof window !== 'undefined' && window.BPMDetailsModule?.updateOnUserChange) {
+            window.BPMDetailsModule.updateOnUserChange();
         }
 
         notificar('Atividade submetida com sucesso.', 'success');

@@ -23,8 +23,8 @@ const multerHandler = (req, res, next) => {
 // Garantir template Planejar em modo mock (idempotente)
 const ensurePlanejarMock = (processoId, usuarioId = 1) => {
     const fixed = [
-        { code: 'PLAN_A', descricao: 'Estabelecer objetivo do Projeto de Melhoria', ordem: 1 },
-        { code: 'PLAN_B', descricao: 'Definir equipe de melhoria', ordem: 2 },
+        { code: 'PLAN_A', descricao: 'Definir equipe de melhoria', ordem: 1 },
+        { code: 'PLAN_B', descricao: 'Estabelecer objetivo do Projeto de Melhoria', ordem: 2 },
         { code: 'PLAN_C', descricao: 'Solicitar documentação existente do processo', ordem: 3 },
         { code: 'PLAN_D', descricao: 'Criar Diagrama de Escopo e Interface (DEIP)', ordem: 4 },
         { code: 'PLAN_E', descricao: 'Elaborar Plano de Projeto (Referente às etapas E e F do Manual)', ordem: 5 },
@@ -173,6 +173,18 @@ router.post('/auth/login', (req, res) => {
 
     const token = createToken(usuario);
     res.json({ token, usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email, perfil: usuario.perfil, setor_id: usuario.setor_id } });
+});
+
+router.get('/auth/opcoes-login', (req, res) => {
+    const opcoes = users
+        .filter((usuario) => usuario.ativo !== false)
+        .map((usuario) => ({
+            id: usuario.id,
+            nome: usuario.nome,
+            email: usuario.email,
+            perfil: usuario.perfil
+        }));
+    res.json(opcoes);
 });
 
 router.get('/auth/perfil', verifyToken, (req, res) => {

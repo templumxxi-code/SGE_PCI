@@ -14,13 +14,45 @@ const { loginLimiter } = require('../middleware/loginLimiter');
  */
 router.post('/login', loginLimiter, async (req, res, next) => {
     try {
-        const { email, senha } = req.body;
+        const { email, senha, perfil } = req.body;
 
         if (!email || !senha) {
             return res.status(400).json({ error: 'Credenciais inválidas.' });
         }
 
-        const resultado = await authController.login(email, senha);
+        const resultado = await authController.login(email, senha, perfil);
+        res.json(resultado);
+    } catch (error) {
+        next(error);
+    }
+});
+
+/**
+ * GET /api/auth/opcoes-login
+ * Listar usuários ativos sem dados sensíveis para a tela de login
+ */
+router.get('/opcoes-login', async (req, res, next) => {
+    try {
+        const opcoes = await authController.listarOpcoesLogin();
+        res.json(opcoes);
+    } catch (error) {
+        next(error);
+    }
+});
+
+/**
+ * POST /api/auth/perfis-disponiveis
+ * Obter perfis disponíveis para um email
+ */
+router.post('/perfis-disponiveis', async (req, res, next) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ error: 'Email é obrigatório.' });
+        }
+
+        const resultado = await authController.obterPerfisDisponíveis(email);
         res.json(resultado);
     } catch (error) {
         next(error);

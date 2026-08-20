@@ -41,6 +41,10 @@ const normalizeProfile = (profile) => {
         SUBCOORDENADOR: 'SUBCOORDENADOR_INSTITUTO',
         SUBCOORDENADOR_REGIONAL: 'SUBCOORDENADOR_REGIONAL',
         SUBCOORDENADOR_INSTITUTO: 'SUBCOORDENADOR_INSTITUTO',
+        SUBCOORDENADOR_FINANCEIRA: 'SUBCOORDENADOR_FINANCEIRA',
+        SUBCOORDENADOR_ADMINISTRATIVA: 'SUBCOORDENADOR_ADMINISTRATIVA',
+        FINANCEIRO: 'SUBCOORDENADOR_FINANCEIRA',
+        ADMINISTRATIVO: 'SUBCOORDENADOR_ADMINISTRATIVA',
         ASSESSORIA: 'ASSESSOR',
         ASSESSOR: 'ASSESSOR',
         SETOR: 'CHEFE_SETOR',
@@ -51,6 +55,22 @@ const normalizeProfile = (profile) => {
         COLABORADOR: 'OPERACIONAL'
     };
     return aliases[normalized] || normalized;
+};
+
+/**
+ * Normalizar múltiplos perfis
+ * Converte um perfil (string) ou múltiplos perfis (array) para um array normalizado
+ */
+const normalizeProfiles = (perfisInput) => {
+    if (!perfisInput) return ['OPERACIONAL'];
+    
+    let perfis = Array.isArray(perfisInput) ? perfisInput : [perfisInput];
+    perfis = perfis
+        .map((p) => normalizeProfile(p))
+        .filter((p) => p && p !== '')
+        .filter((p, index, arr) => arr.indexOf(p) === index); // Remover duplicatas
+    
+    return perfis.length > 0 ? perfis : ['OPERACIONAL'];
 };
 
 const normalizeOrganizationType = (profile) => {
@@ -98,8 +118,9 @@ const createDefaultSeed = () => {
 
 const readUsers = () => {
     ensureStorageDirectory();
+    const seed = createDefaultSeed();
+
     if (!fs.existsSync(STORAGE_FILE)) {
-        const seed = createDefaultSeed();
         fs.writeFileSync(STORAGE_FILE, JSON.stringify(seed, null, 2));
         return seed;
     }
@@ -107,18 +128,21 @@ const readUsers = () => {
     try {
         const raw = fs.readFileSync(STORAGE_FILE, 'utf8');
         const parsed = JSON.parse(raw);
-        const sanitized = stripDemoAccounts(parsed);
-        if (!Array.isArray(parsed) || sanitized.length === 0) {
-            const seed = createDefaultSeed();
-            fs.writeFileSync(STORAGE_FILE, JSON.stringify(seed, null, 2));
-            return seed;
+        const sanitized = stripDemoAccounts(Array.isArray(parsed) ? parsed : []);
+
+        const hasAdmin = sanitized.some((user) => String(user?.email || '').trim().toLowerCase() === 'admin@pci.rn.gov.br');
+        const normalizedUsers = hasAdmin ? sanitized : [...seed, ...sanitized];
+
+        if (normalizedUsers.length !== sanitized.length + (hasAdmin ? 0 : 1)) {
+            fs.writeFileSync(STORAGE_FILE, JSON.stringify(normalizedUsers, null, 2));
         }
-        if (sanitized.length !== parsed.length) {
-            fs.writeFileSync(STORAGE_FILE, JSON.stringify(sanitized, null, 2));
+
+        if (!hasAdmin) {
+            fs.writeFileSync(STORAGE_FILE, JSON.stringify(normalizedUsers, null, 2));
         }
-        return sanitized;
+
+        return normalizedUsers;
     } catch (error) {
-        const seed = createDefaultSeed();
         fs.writeFileSync(STORAGE_FILE, JSON.stringify(seed, null, 2));
         return seed;
     }
@@ -131,9 +155,14 @@ const writeUsers = (users) => {
 
 const normalizeUser = (user) => {
     if (!user) return null;
-    const perfil = normalizeProfile(user.perfil || user.role);
+    
+    // Suportar tanto perfil único quanto múltiplos perfis
+    const perfis = normalizeProfiles(user.perfis || user.perfil || user.role);
+    // Para compatibilidade, manter o primeiro perfil como "perfil" único
+    const perfil = perfis[0];
     const organizationType = user.organizationType || user.organization_type || normalizeOrganizationType(perfil);
     const sectorId = user.sectorId ?? user.sector_id ?? user.setor_id ?? null;
+    
     return {
         ...user,
         id: Number(user.id),
@@ -141,7 +170,8 @@ const normalizeUser = (user) => {
         name: user.name || user.nome || 'Usuário',
         registration: user.registration || user.matricula || null,
         email: String(user.email || '').trim().toLowerCase(),
-        perfil,
+        perfis, // Array de perfis do usuário
+        perfil, // Primeiro perfil (para compatibilidade)
         role: perfil,
         organizationType,
         organizationUnitId: user.organizationUnitId ?? user.organization_unit_id ?? user.unitId ?? user.unit_id ?? null,
@@ -192,12 +222,18 @@ const verifyPassword = async (email, senha) => {
 const createUser = async (input) => {
     const users = readUsers().map(normalizeUser).filter(Boolean);
     const now = new Date().toISOString();
+    
+    // Suportar perfis (múltiplos) ou perfil (único)
+    const perfisInput = input.perfis || input.perfil || input.role || 'OPERACIONAL';
+    const perfis = normalizeProfiles(perfisInput);
+    
     const normalizedInput = normalizeUser({
         ...input,
         nome: input.nome || input.name,
         name: input.name || input.nome,
         registration: input.registration || input.matricula,
         email: input.email,
+        perfis, // Armazenar múltiplos perfis
         perfil: input.perfil || input.role,
         role: input.role || input.perfil,
         organizationType: input.organizationType || input.organization_type,
@@ -307,5 +343,6 @@ module.exports = {
     changePassword,
     resetStore,
     normalizeProfile,
+    normalizeProfiles,
     sanitizeUser
 };

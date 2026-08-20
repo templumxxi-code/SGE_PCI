@@ -22,8 +22,8 @@ const getUsuarioSetorId = async (usuarioId) => {
  * Será executado dentro de uma transação (client)
  */
 const fixedPlanejarActivities = [
-    { code: 'PLAN_A', descricao: 'A) Estabelecer objetivo do Projeto de Melhoria', ordem: 1 },
-    { code: 'PLAN_B', descricao: 'B) Definir equipe de melhoria', ordem: 2 },
+    { code: 'PLAN_A', descricao: 'A) Definir equipe de melhoria', ordem: 1 },
+    { code: 'PLAN_B', descricao: 'B) Estabelecer objetivo do Projeto de Melhoria', ordem: 2 },
     { code: 'PLAN_C', descricao: 'C) Solicitar documentação existente do processo', ordem: 3 },
     { code: 'PLAN_D', descricao: 'D) Diagrama de Escopo e Interface (DEIP)', ordem: 4 },
     { code: 'PLAN_E', descricao: 'E) Elaborar Plano de Projeto', ordem: 5 },

@@ -9,6 +9,45 @@ const BPMDetailsModule = (() => {
     let allProcesses = [];
     let currentUser = null;
 
+    const getVisibleProcesses = () => {
+        const user = window.app?.currentUser || currentUser || {};
+        if (window.AccessControl?.getVisibleProcesses) return window.AccessControl.getVisibleProcesses(user, allProcesses);
+        return allProcesses;
+    };
+
+    const getPhaseChecklistStats = (processes, phaseName) => (processes || []).reduce((result, processo) => {
+        const phase = (processo.phases || []).find(item => item.name === phaseName);
+        (phase?.activities || []).forEach(activity => {
+            const checklist = Array.isArray(activity.checklist) ? activity.checklist : [];
+            checklist.forEach(item => {
+                result.total += 1;
+                if (item?.concluido === true) result.completed += 1;
+            });
+        });
+        return result;
+    }, { total: 0, completed: 0 });
+
+    const getPhaseConformity = (processes, phaseName) => {
+        const stats = getPhaseChecklistStats(processes, phaseName);
+        return { ...stats, pending: stats.total - stats.completed, percent: stats.total ? Math.round(stats.completed / stats.total * 100) : 0 };
+    };
+
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+
+    const renderPhaseCards = () => {
+        const visibleProcesses = getVisibleProcesses();
+        PHASES.forEach(phase => {
+            const phaseProcesses = visibleProcesses.filter(processo => (processo.status_fase || processo.currentPhase || 'Planejar') === phase);
+            const stats = getPhaseConformity(visibleProcesses, phase);
+            const count = document.querySelector(`[data-bpm-count="${phase}"]`);
+            const progress = document.querySelector(`[data-bpm-progress="${phase}"]`);
+            const percent = document.querySelector(`[data-bpm-percent="${phase}"]`);
+            if (count) count.textContent = phaseProcesses.length.toLocaleString('pt-BR');
+            if (progress) progress.style.width = `${stats.percent}%`;
+            if (percent) percent.textContent = `${stats.percent}%`;
+        });
+    };
+
     /**
      * Inicializar módulo
      */
@@ -76,21 +115,16 @@ const BPMDetailsModule = (() => {
                 allProcesses = ProcessManager.getStoredProcesses() || [];
                 if (allProcesses.length > 0) {
                     console.log(`[BPM] Carregados ${allProcesses.length} processos do ProcessManager`);
+                    renderPhaseCards();
                     return;
                 }
             }
 
-            // Fallback: usar dados mockados se disponíveis
-            if (window.mockProcesses) {
-                allProcesses = window.mockProcesses;
-                console.log(`[BPM] Usando ${allProcesses.length} processos mockeados`);
-                return;
-            }
-
-            // Última tentativa: chamar API
+            // Última tentativa: chamar a API real
             try {
                 const response = await api.get('/processes');
                 allProcesses = Array.isArray(response) ? response : response.data || [];
+                renderPhaseCards();
             } catch (apiError) {
                 console.log('[BPM] API não disponível, usando dados vazios');
                 allProcesses = [];
@@ -98,6 +132,7 @@ const BPMDetailsModule = (() => {
         } catch (error) {
             console.error('[BPM] Erro ao carregar processos:', error);
             allProcesses = [];
+            renderPhaseCards();
         }
     };
 
@@ -183,18 +218,10 @@ const BPMDetailsModule = (() => {
         if (!tbody || !currentPhase) return;
 
         // Filtrar processos pela fase atual
-        let filtered = allProcesses.filter(p => {
+        let filtered = getVisibleProcesses().filter(p => {
             const processPhase = p.status_fase || 'Não informado';
             return processPhase === currentPhase;
         });
-
-        // Se não é Admin, filtrar apenas pelo usuário atual
-        if (!isAdmin && currentUser?.id) {
-            filtered = filtered.filter(p => {
-                const responsavelId = p.responsavel_id || p.responsibleId || p.responsible_id;
-                return responsavelId === currentUser.id;
-            });
-        }
 
         // Aplicar filtros do usuário (se Admin)
         if (isAdmin) {
@@ -216,6 +243,11 @@ const BPMDetailsModule = (() => {
             }
         }
 
+        const statusFilter = document.getElementById('bpm-status-filter')?.value || '';
+        if (statusFilter) {
+            filtered = filtered.filter(p => String(p.status_fase || p.status || '').toLowerCase() === statusFilter.toLowerCase());
+        }
+
         // Renderizar tabela
         if (filtered.length === 0) {
             tbody.innerHTML = `
@@ -235,16 +267,16 @@ const BPMDetailsModule = (() => {
             const dataFim = processo.data_fim 
                 ? new Date(processo.data_fim).toLocaleDateString('pt-BR') 
                 : 'N/A';
-            const progresso = processo.percentual_conclusao || 0;
+            const progresso = getPhaseConformity([processo], currentPhase).percent;
             const responsavel = processo.responsavel_nome || processo.responsableName || processo.responsavel_nome || 'N/A';
-            const setor = processo.setor_nome || `Setor ${processo.setor_id || processo.sectorId || 'N/A'}`;
+            const setor = processo.setor_nome || processo.unitName || `Setor ${processo.setor_id || processo.sectorId || 'N/A'}`;
 
             return `
                 <tr>
-                    <td>${responsavel}</td>
-                    <td>${processo.nome || 'N/A'}</td>
-                    <td>${setor}</td>
-                    <td>${processo.status_fase || 'N/A'}</td>
+                    <td>${escapeHtml(responsavel)}</td>
+                    <td>${escapeHtml(processo.nome || 'N/A')}</td>
+                    <td>${escapeHtml(setor)}</td>
+                    <td>${escapeHtml(processo.status_fase || 'N/A')}</td>
                     <td>
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <div style="flex: 1; min-width: 100px;">
@@ -255,8 +287,8 @@ const BPMDetailsModule = (() => {
                             <span style="min-width: 45px;">${progresso}%</span>
                         </div>
                     </td>
-                    <td>${dataInicio}</td>
-                    <td>${dataFim}</td>
+                    <td>${escapeHtml(dataInicio)}</td>
+                    <td>${escapeHtml(dataFim)}</td>
                     <td>
                         <span class="badge ${progresso === 100 ? 'badge-success' : progresso > 50 ? 'badge-info' : 'badge-warning'}">
                             ${progresso === 100 ? 'Concluído' : 'Em andamento'}
@@ -296,7 +328,11 @@ const BPMDetailsModule = (() => {
      */
     const updateOnUserChange = () => {
         currentUser = window.app?.currentUser || window.AccessControl?.getCurrentUser?.() || {};
-        loadProcesses();
+        loadProcesses().then(() => {
+            populateSectorFilter();
+            renderPhaseCards();
+            if (currentPhase) renderPhaseDetails();
+        });
     };
 
     return {
@@ -306,6 +342,8 @@ const BPMDetailsModule = (() => {
         closeModal
     };
 })();
+
+window.BPMDetailsModule = BPMDetailsModule;
 
 // Inicializar quando a página carregar
 document.addEventListener('DOMContentLoaded', () => {

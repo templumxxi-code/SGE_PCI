@@ -4,6 +4,7 @@
 
 const jwt = require('jsonwebtoken');
 const { queryOne } = require('../models/db');
+const { findUserById, findUserByEmail } = require('../models/userStore');
 const { normalizePerfil, isGlobalAdmin, isAnySectorRole } = require('../services/roles');
 
 const getJwtSecret = () => {
@@ -67,6 +68,20 @@ const verifyToken = async (req, res, next) => {
             };
             return next();
         } catch (error) {
+            const localUser = decoded.id ? findUserById(decoded.id) : (decoded.email ? findUserByEmail(decoded.email) : null);
+            if (localUser && localUser.active !== false) {
+                req.user = {
+                    ...decoded,
+                    id: Number(localUser.id),
+                    email: localUser.email,
+                    nome: localUser.nome || localUser.name,
+                    perfil: normalizePerfil(localUser.perfil || localUser.role),
+                    setor_id: localUser.setor_id || localUser.sectorId || decoded.setor_id || null,
+                    ativo: localUser.active !== false
+                };
+                return next();
+            }
+
             console.warn('Erro ao validar usuário autenticado:', error.message);
             return res.status(401).json({ error: 'Token inválido ou expirado' });
         }

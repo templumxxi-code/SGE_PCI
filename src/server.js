@@ -144,14 +144,14 @@ const startServer = async (port = PORT) => {
     serverInstance = app.listen(port, () => {
         console.log(`
     ╔════════════════════════════════════════════════════════════╗
-    ║   SMP PCI - Sistema de Monitoramento de Processos BPM      ║
+    ║   SGE PCI/RN - Sistema de Gestão Estratégica               ║
     ║   Polícia Científica do Rio Grande do Norte                ║
     ╠════════════════════════════════════════════════════════════╣
     ║   🚀 Servidor iniciado com sucesso!                        ║
     ║   📍 URL: http://localhost:${port}                            ║
     ║   🔧 Ambiente: ${process.env.NODE_ENV || 'development'}
     ║   📅 Timestamp: ${new Date().toISOString()}                 ║
-    ╚════════════════════════════════════════════════════╝
+    ╚════════════════════════════════════════════════════════════╝
     `);
     });
 

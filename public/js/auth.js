@@ -126,6 +126,36 @@ class AuthManager {
     }
 
     /**
+     * Obter usuários ativos disponíveis no seletor de login
+     */
+    static async listLoginOptions() {
+        const response = await fetch(`${this.baseUrl}/auth/opcoes-login`);
+        if (!response.ok) {
+            throw new Error(`Erro na requisição: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    /**
+     * Obter perfis disponíveis para um email
+     */
+    static async getProfilesForEmail(email) {
+        const response = await fetch(`${this.baseUrl}/auth/perfis-disponiveis`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Erro na requisição: ${response.status}`);
+        }
+
+        return await response.json();
+    }
+
+    /**
      * Listar usuários (apenas admin)
      */
     static async listUsers() {

@@ -5,23 +5,24 @@
 
 /* Modo Escuro - Ativado quando data-theme="dark" */
 html[data-theme="dark"] {
+    color-scheme: dark;
     /* Cores Primárias - Modo Escuro */
-    --color-primary-dark: #0a2e66;      /* Azul escuro mais claro */
-    --color-primary: #1e5ba8;           /* Azul */
-    --color-primary-light: #2575d0;     /* Azul claro */
-    --color-accent: #ffc107;            /* Dourado (mantido) */
-    --color-success: #4caf50;           /* Verde mais claro */
-    --color-danger: #f44336;            /* Vermelho mais claro */
-    --color-warning: #ff9800;           /* Laranja */
-    --color-info: #29b6f6;              /* Ciano mais claro */
+    --color-primary-dark: #b7d5ff;      /* Azul claro para títulos e números */
+    --color-primary: #75b2ff;           /* Azul legível em fundo escuro */
+    --color-primary-light: #a7ceff;
+    --color-accent: #ffd45c;
+    --color-success: #72d792;
+    --color-danger: #ff7d88;
+    --color-warning: #ffd166;
+    --color-info: #70d9ff;
     
     /* Escala de Cinza - Modo Escuro */
     --color-bg: #1a1a1a;               /* Fundo escuro */
     --color-bg-secondary: #2d2d2d;     /* Fundo secundário */
-    --color-text: #e8e8e8;             /* Texto claro */
-    --color-text-secondary: #a0a0a0;   /* Texto secundário */
-    --color-border: #404040;           /* Borda */
-    --color-white: #252525;            /* Branco (mais escuro) */
+    --color-text: #f2f5f8;
+    --color-text-secondary: #c4ccd6;
+    --color-border: #4b5563;
+    --color-white: #23272e;
 }
 
 /* Estilos específicos para modo escuro */
@@ -57,6 +58,49 @@ html[data-theme="dark"] select {
 html[data-theme="dark"] input::placeholder,
 html[data-theme="dark"] textarea::placeholder {
     color: var(--color-text-secondary);
+    opacity: 1;
+}
+
+html[data-theme="dark"] .dashboard-content h2,
+html[data-theme="dark"] .dashboard-content h3,
+html[data-theme="dark"] .dashboard-content h4,
+html[data-theme="dark"] .phase-header h3,
+html[data-theme="dark"] .metric-card h3,
+html[data-theme="dark"] .table-card h3 {
+    color: var(--color-text);
+}
+
+html[data-theme="dark"] .subtitle,
+html[data-theme="dark"] .metric-label,
+html[data-theme="dark"] .process-meta-item,
+html[data-theme="dark"] .dashboard-empty-state,
+html[data-theme="dark"] .dashboard-chart-summary,
+html[data-theme="dark"] .dashboard-summary-strip,
+html[data-theme="dark"] .text-muted {
+    color: var(--color-text-secondary) !important;
+}
+
+html[data-theme="dark"] .phase-count,
+html[data-theme="dark"] .metric-value,
+html[data-theme="dark"] .phase-header i,
+html[data-theme="dark"] .phase-progress span {
+    color: var(--color-primary-dark);
+}
+
+html[data-theme="dark"] .data-table th,
+html[data-theme="dark"] .data-table td,
+html[data-theme="dark"] label {
+    color: var(--color-text);
+}
+
+html[data-theme="dark"] .data-table td .text-muted,
+html[data-theme="dark"] .data-table td small {
+    color: var(--color-text-secondary) !important;
+}
+
+html[data-theme="dark"] select option {
+    background: var(--color-bg-secondary);
+    color: var(--color-text);
 }
 
 html[data-theme="dark"] .btn-secondary {

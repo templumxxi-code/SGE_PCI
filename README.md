@@ -1,7 +1,7 @@
-# 🔐 SMP PCI - Sistema de Monitoramento de Processos BPM
+# 🔐 SGE PCI/RN - Sistema de Gestão Estratégica
 ## Polícia Científica do Rio Grande do Norte
 
-Sistema web moderno, responsivo e seguro para monitoramento de processos seguindo a metodologia BPM (Planejar, Analisar, Desenhar, Implementar, Monitorar).
+Sistema web moderno, responsivo e seguro para gestão estratégica institucional, com foco em planejamento, indicadores, processos, governança, responsabilidades e acompanhamento do desempenho da Polícia Científica do Rio Grande do Norte.
 
 ![Ciclo de Vida do BPM](public/assets/bpm-cycle.svg)
 

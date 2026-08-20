@@ -64,10 +64,38 @@
             allowedUnitTypes: ['INSTITUTO']
         },
         {
+            key: 'SUBCOORDENADOR_FINANCEIRA',
+            label: 'Subcoordenador Financeiro',
+            visibleName: 'Subcoordenador Financeiro',
+            hierarchy: 4,
+            unitType: 'ASSESSORIA',
+            description: 'Coordenação financeira',
+            tabs: ['dashboard-setor', 'meus-processos', 'monitoramento-bpm', 'indicadores', 'aprovacoes'],
+            menu: ['dashboard-setor', 'meus-processos', 'monitoramento-bpm', 'indicadores', 'aprovacoes'],
+            actions: ['view', 'edit', 'approve'],
+            canApprove: true,
+            canSeeAll: false,
+            allowedUnitTypes: ['ASSESSORIA']
+        },
+        {
+            key: 'SUBCOORDENADOR_ADMINISTRATIVA',
+            label: 'Subcoordenador Administrativo',
+            visibleName: 'Subcoordenador Administrativo',
+            hierarchy: 4,
+            unitType: 'ASSESSORIA',
+            description: 'Coordenação administrativa',
+            tabs: ['dashboard-setor', 'meus-processos', 'monitoramento-bpm', 'indicadores', 'aprovacoes'],
+            menu: ['dashboard-setor', 'meus-processos', 'monitoramento-bpm', 'indicadores', 'aprovacoes'],
+            actions: ['view', 'edit', 'approve'],
+            canApprove: true,
+            canSeeAll: false,
+            allowedUnitTypes: ['ASSESSORIA']
+        },
+        {
             key: 'ASSESSOR',
             label: 'Assessor',
             visibleName: 'Assessor',
-            hierarchy: 4,
+            hierarchy: 5,
             unitType: 'ASSESSORIA',
             description: 'Assessoria técnica',
             tabs: ['dashboard-setor', 'meus-processos', 'monitoramento-bpm', 'indicadores', 'aprovacoes'],
@@ -81,7 +109,7 @@
             key: 'CHEFE_NUCLEO',
             label: 'Chefe de Núcleo',
             visibleName: 'Chefe de Núcleo',
-            hierarchy: 5,
+            hierarchy: 6,
             unitType: 'NUCLEO',
             description: 'Gestão do núcleo',
             tabs: ['dashboard-setor', 'meus-processos', 'monitoramento-bpm', 'indicadores', 'aprovacoes'],
@@ -128,6 +156,13 @@
         approvals: 'sge_pci_approval_history'
     };
 
+    const STANDARD_UNITS = [
+        { id: 4, name: 'Natal', active: true },
+        { id: 1, name: 'Pau dos Ferros', active: true },
+        { id: 3, name: 'Mossoró', active: true },
+        { id: 2, name: 'Caicó', active: true }
+    ];
+
     const STATUS_DEFINITIONS = {
         RASCUNHO: { visible: 'Rascunho', nextRole: 'CHEFE_SETOR' },
         AGUARDANDO_CHEFE_SETOR: { visible: 'Aguardando Chefe de Setor', nextRole: 'CHEFE_SETOR' },
@@ -154,6 +189,10 @@
             SUBCOORDENADOR: 'SUBCOORDENADOR_INSTITUTO',
             SUBCOORDENADOR_REGIONAL: 'SUBCOORDENADOR_REGIONAL',
             SUBCOORDENADOR_INSTITUTO: 'SUBCOORDENADOR_INSTITUTO',
+            SUBCOORDENADOR_FINANCEIRA: 'SUBCOORDENADOR_FINANCEIRA',
+            SUBCOORDENADOR_ADMINISTRATIVA: 'SUBCOORDENADOR_ADMINISTRATIVA',
+            FINANCEIRO: 'SUBCOORDENADOR_FINANCEIRA',
+            ADMINISTRATIVO: 'SUBCOORDENADOR_ADMINISTRATIVA',
             ASSESSORIA: 'ASSESSOR',
             ASSESSOR: 'ASSESSOR',
             SETOR: 'CHEFE_SETOR',
@@ -272,7 +311,15 @@
         try {
             const raw = localStorage.getItem(STORAGE_KEYS.organization);
             const base = { institutes: [], regionais: [], subcoordenações: [], assessorias: [], nuclei: [], sectors: [] };
-            return raw ? { ...base, ...JSON.parse(raw) } : base;
+            const data = raw ? { ...base, ...JSON.parse(raw) } : base;
+            const knownNames = new Set(STANDARD_UNITS.map(unit => unit.name));
+            const storedRegions = Array.isArray(data.regionais) ? data.regionais : [];
+            const hasOnlyStandardRegions = storedRegions.every(item => knownNames.has(item.name));
+            if (hasOnlyStandardRegions) {
+                const byName = new Map(storedRegions.map(item => [item.name, item]));
+                data.regionais = STANDARD_UNITS.map(unit => ({ ...unit, ...(byName.get(unit.name) || {}) }));
+            }
+            return data;
         } catch (error) {
             return { institutes: [], regionais: [], subcoordenações: [], assessorias: [], nuclei: [], sectors: [] };
         }
@@ -338,9 +385,10 @@
             { id: 3, name: 'Identificação', active: true, createdAt: new Date().toISOString() }
         ];
         const regionais = [
+            { id: 4, name: 'Natal', active: true, createdAt: new Date().toISOString() },
             { id: 1, name: 'Pau dos Ferros', active: true, createdAt: new Date().toISOString() },
-            { id: 2, name: 'Caicó', active: true, createdAt: new Date().toISOString() },
-            { id: 3, name: 'Mossoró', active: true, createdAt: new Date().toISOString() }
+            { id: 3, name: 'Mossoró', active: true, createdAt: new Date().toISOString() },
+            { id: 2, name: 'Caicó', active: true, createdAt: new Date().toISOString() }
         ];
         const subcoordenações = [
             { id: 1, name: 'Subcoordenação de Apoio Operacional', active: true, parentType: 'REGIONAL', parentId: 1, createdAt: new Date().toISOString() }
@@ -397,7 +445,7 @@
             case 'REGIONAL':
                 return ['OPERACIONAL', 'CHEFE_SETOR', 'CHEFE_NUCLEO', 'SUBCOORDENADOR_REGIONAL'];
             case 'ASSESSORIA':
-                return ['OPERACIONAL', 'CHEFE_SETOR', 'CHEFE_NUCLEO', 'ASSESSOR'];
+                return ['OPERACIONAL', 'CHEFE_SETOR', 'CHEFE_NUCLEO', 'SUBCOORDENADOR_FINANCEIRA', 'SUBCOORDENADOR_ADMINISTRATIVA', 'ASSESSOR'];
             default:
                 return ['OPERACIONAL', 'CHEFE_SETOR', 'CHEFE_NUCLEO'];
         }
@@ -439,9 +487,19 @@
         }
 
         const processOrgType = String(normalizedProcess.organizationType || 'SETOR').toUpperCase();
-        if (!profile.allowedUnitTypes.includes(processOrgType) && processOrgType !== 'PENDENTE') {
-            return false;
-        }
+        const hierarchicalTypes = {
+            DIRETOR_INSTITUTO: ['INSTITUTO', 'NUCLEO', 'SETOR'],
+            SUBCOORDENADOR_INSTITUTO: ['INSTITUTO', 'NUCLEO', 'SETOR'],
+            SUBCOORDENADOR_REGIONAL: ['REGIONAL', 'NUCLEO', 'SETOR'],
+            ASSESSOR: ['ASSESSORIA', 'NUCLEO', 'SETOR'],
+            SUBCOORDENADOR_FINANCEIRA: ['ASSESSORIA', 'NUCLEO', 'SETOR'],
+            SUBCOORDENADOR_ADMINISTRATIVA: ['ASSESSORIA', 'NUCLEO', 'SETOR'],
+            CHEFE_NUCLEO: ['NUCLEO', 'SETOR'],
+            CHEFE_SETOR: ['SETOR'],
+            OPERACIONAL: ['SETOR']
+        };
+        const allowedTypes = hierarchicalTypes[normalizedUser.accessProfileKey] || profile.allowedUnitTypes;
+        if (!allowedTypes.includes(processOrgType) && processOrgType !== 'PENDENTE') return false;
 
         const processUnitId = String(normalizedProcess.organizationUnitId || normalizedProcess.instituteId || normalizedProcess.regionalId || normalizedProcess.advisoryId || normalizedProcess.nucleusId || normalizedProcess.sectorId || '').trim();
         const userUnitId = String(normalizedUser.organizationUnitId || normalizedUser.instituteId || normalizedUser.regionalId || normalizedUser.advisoryId || normalizedUser.nucleusId || normalizedUser.sectorId || '').trim();
@@ -618,6 +676,178 @@
         }
     }
 
+    const NOTIFICATION_STORAGE_KEY = 'sge_pci_notifications';
+
+    function safeParseJson(value, fallback) {
+        try {
+            return value ? JSON.parse(value) : fallback;
+        } catch (error) {
+            return fallback;
+        }
+    }
+
+    function getAllNotifications() {
+        const notifications = safeParseJson(localStorage.getItem(NOTIFICATION_STORAGE_KEY), []);
+        return Array.isArray(notifications) ? notifications.map(normalizeNotification).filter(Boolean) : [];
+    }
+
+    function normalizeNotification(notification) {
+        if (!notification || typeof notification !== 'object') return null;
+        const normalized = { ...notification };
+        normalized.id = normalized.id || `notification-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        normalized.category = normalized.category || 'SYSTEM';
+        normalized.priority = normalized.priority || 'INFO';
+        normalized.read = Boolean(normalized.read);
+        normalized.archived = Boolean(normalized.archived);
+        normalized.createdAt = normalized.createdAt || new Date().toISOString();
+        normalized.readAt = normalized.readAt || null;
+        return normalized;
+    }
+
+    function saveNotifications(notifications) {
+        localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify((Array.isArray(notifications) ? notifications : []).map(normalizeNotification).filter(Boolean)));
+    }
+
+    function notificationExists(dedupKey) {
+        if (!dedupKey) return false;
+        return getAllNotifications().some((notification) => String(notification.dedupKey || '').trim() === String(dedupKey).trim());
+    }
+
+    const ALLOWED_NOTIFICATION_EVENTS = [
+        'PROCESSO_CRIADO',
+        'PROCESSO_SUBMETIDO',
+        'ATIVIDADE_SUBMETIDA',
+        'ATIVIDADE_AVANCADA',
+        'PROCESSO_APROVADO',
+        'PROCESSO_DEVOLVIDO',
+        'PROCESSO_HOMOLOGADO',
+        'PROCESSO_ARQUIVADO',
+        'INDICADOR_CADASTRADO',
+        'CONTRA_MEDIDA_CADASTRADA',
+        'USUARIO_CRIADO',
+        'USUARIO_ATUALIZADO',
+        'USUARIO_INATIVADO',
+        'PRAZO_VENCIDO',
+        'SISTEMA'
+    ];
+
+    function isKnownEventSource(sourceEvent) {
+        return ALLOWED_NOTIFICATION_EVENTS.includes(String(sourceEvent || '').trim().toUpperCase());
+    }
+
+    function createNotification(params = {}) {
+        const payload = { ...params };
+        const sourceEvent = String(payload.sourceEvent || payload.eventType || 'SISTEMA').trim().toUpperCase();
+        if (!isKnownEventSource(sourceEvent)) {
+            return null;
+        }
+
+        const dedupKey = payload.dedupKey || [
+            sourceEvent,
+            payload.processId || '',
+            payload.recipientUserId || payload.targetUserId || '',
+            payload.entityId || payload.targetProcessId || payload.indicatorId || '',
+            payload.createdAt || new Date().toISOString()
+        ].join(':');
+
+        if (notificationExists(dedupKey)) {
+            return null;
+        }
+
+        const normalized = normalizeNotification({
+            id: payload.id || `notification-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            recipientUserId: payload.recipientUserId || null,
+            recipientRole: payload.recipientRole || null,
+            organizationType: payload.organizationType || null,
+            organizationUnitId: payload.organizationUnitId || null,
+            instituteId: payload.instituteId || null,
+            regionalId: payload.regionalId || null,
+            advisoryId: payload.advisoryId || null,
+            nucleusId: payload.nucleusId || null,
+            sectorId: payload.sectorId || null,
+            processId: payload.processId || null,
+            indicatorId: payload.indicatorId || null,
+            phaseCode: payload.phaseCode || null,
+            activityCode: payload.activityCode || null,
+            category: payload.category || 'SYSTEM',
+            priority: payload.priority || 'INFO',
+            title: payload.title || 'Notificação',
+            message: payload.message || '',
+            read: Boolean(payload.read),
+            archived: Boolean(payload.archived),
+            targetSection: payload.targetSection || null,
+            targetProcessId: payload.targetProcessId || payload.processId || null,
+            targetPhaseCode: payload.targetPhaseCode || payload.phaseCode || null,
+            targetActivityCode: payload.targetActivityCode || payload.activityCode || null,
+            targetIndicatorId: payload.targetIndicatorId || payload.indicatorId || null,
+            createdAt: payload.createdAt || new Date().toISOString(),
+            readAt: payload.readAt || null,
+            dedupKey,
+            eventType: sourceEvent,
+            sourceEvent,
+        });
+
+        const existing = getAllNotifications();
+        existing.unshift(normalized);
+        saveNotifications(existing);
+        return normalized;
+    }
+
+    function getNotificationsForUser(user) {
+        const normalizedUser = normalizeUser(user);
+        const notifications = getAllNotifications();
+        return notifications.filter((notification) => canUserReceiveNotification(normalizedUser, notification));
+    }
+
+    function getUnreadNotificationCount(user) {
+        return getNotificationsForUser(user).filter((notification) => !notification.read).length;
+    }
+
+    function canUserReceiveNotification(user, notification) {
+        if (!notification || typeof notification !== 'object') return false;
+
+        const normalizedUser = normalizeUser(user);
+        if (!normalizedUser || !normalizedUser.accessProfileKey) return false;
+
+        if (String(normalizedUser.accessProfileKey).toUpperCase() === 'NGE_ADMIN') {
+            return !Boolean(notification.archived);
+        }
+
+        if (notification.recipientUserId && String(notification.recipientUserId) !== String(normalizedUser.id)) {
+            return false;
+        }
+
+        if (notification.recipientRole && String(notification.recipientRole).toUpperCase() !== String(normalizedUser.accessProfileKey).toUpperCase()) {
+            return false;
+        }
+
+        if (notification.processId) {
+            const processList = safeParseJson(localStorage.getItem('sge_pci_processos'), []);
+            const process = Array.isArray(processList) ? processList.find((item) => String(item.id) === String(notification.processId)) : null;
+            if (process && !canViewProcess(normalizedUser, process)) {
+                return false;
+            }
+        }
+
+        if (notification.instituteId && normalizedUser.instituteId && String(normalizedUser.instituteId) !== String(notification.instituteId)) {
+            return false;
+        }
+        if (notification.regionalId && normalizedUser.regionalId && String(normalizedUser.regionalId) !== String(notification.regionalId)) {
+            return false;
+        }
+        if (notification.advisoryId && normalizedUser.advisoryId && String(normalizedUser.advisoryId) !== String(notification.advisoryId)) {
+            return false;
+        }
+        if (notification.nucleusId && normalizedUser.nucleusId && String(normalizedUser.nucleusId) !== String(notification.nucleusId)) {
+            return false;
+        }
+        if (notification.sectorId && normalizedUser.sectorId && String(normalizedUser.sectorId) !== String(notification.sectorId)) {
+            return false;
+        }
+
+        return !Boolean(notification.archived);
+    }
+
     return {
         PROFILE_DEFINITIONS,
         STORAGE_KEYS,
@@ -655,6 +885,15 @@
         getPendingApprovals,
         getProfileOptionsForLogin,
         saveCurrentUser,
-        getCurrentUser
+        getCurrentUser,
+        getAllNotifications,
+        normalizeNotification,
+        saveNotifications,
+        notificationExists,
+        createNotification,
+        getNotificationsForUser,
+        getUnreadNotificationCount,
+        canUserReceiveNotification,
+        NOTIFICATION_STORAGE_KEY
     };
 });

@@ -79,3 +79,38 @@ test('cadastro e login de usuário novo funcionam com o armazenamento local', as
   assert.equal(newLoginBody.usuario.email, uniqueEmail);
   assert.equal(newLoginBody.usuario.perfil, 'OPERACIONAL');
 });
+
+test('cadastro aceita perfis de coordenação financeira e administrativa', async (t) => {
+  const server = await startServer(0);
+  t.after(() => new Promise((resolve, reject) => {
+    server.close((error) => (error ? reject(error) : resolve()));
+  }));
+
+  const { port } = server.address();
+  const adminLogin = await fetch(`http://127.0.0.1:${port}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'admin@pci.rn.gov.br', senha: 'admin123' })
+  });
+
+  const adminBody = await adminLogin.json();
+  const uniqueEmail = `financeiro-${Date.now()}@pci.rn.gov.br`;
+
+  const registerResponse = await fetch(`http://127.0.0.1:${port}/api/auth/registrar`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${adminBody.token}`
+    },
+    body: JSON.stringify({
+      nome: 'Financeiro Teste',
+      email: uniqueEmail,
+      senha: 'senhateste123',
+      perfil: 'SUBCOORDENADOR_FINANCEIRA'
+    })
+  });
+
+  assert.equal(registerResponse.status, 201);
+  const createdUser = await registerResponse.json();
+  assert.equal(createdUser.perfil, 'SUBCOORDENADOR_FINANCEIRA');
+});

@@ -251,6 +251,111 @@ textarea {
     gap: var(--spacing-md);
 }
 
+.field-required > label::after {
+    content: " *";
+    color: #b42318;
+    font-weight: 700;
+}
+
+.form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-field.is-invalid input,
+.form-field.is-invalid select,
+.form-field.is-invalid textarea {
+    border-color: #b42318;
+    box-shadow: 0 0 0 3px rgba(180, 35, 24, 0.08);
+}
+
+.field-message {
+    min-height: 1.1rem;
+    font-size: 0.8rem;
+    color: #b42318;
+}
+
+.form-grid {
+    display: grid;
+    gap: var(--spacing-md);
+}
+
+.form-grid.two-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.form-grid.one-column {
+    grid-template-columns: 1fr;
+}
+
+.full-width {
+    grid-column: 1 / -1;
+}
+
+.user-form {
+    background: var(--color-white);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-lg);
+    margin-top: 1rem;
+    box-shadow: var(--shadow-sm);
+}
+
+.user-form-header {
+    margin-bottom: var(--spacing-md);
+}
+
+.user-form-section {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.user-form-section h5 {
+    margin: 0 0 var(--spacing-md) 0;
+    color: var(--color-primary-dark);
+    font-size: 1rem;
+}
+
+.password-input-group {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.password-input-group input {
+    flex: 1 1 180px;
+}
+
+.user-assignment-summary {
+    margin-top: var(--spacing-md);
+    padding: 0.75rem 1rem;
+    background: rgba(0, 61, 153, 0.05);
+    border: 1px solid rgba(0, 61, 153, 0.12);
+    border-radius: var(--border-radius);
+    color: var(--color-primary-dark);
+}
+
+.table-toolbar {
+    margin: 1rem 0;
+}
+
+.table-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.table-filters input,
+.table-filters select {
+    width: 100%;
+}
+
 /* ============================================================================
    Tabelas
    ============================================================================ */
