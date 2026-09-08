@@ -25,6 +25,8 @@ const createError = (message, statusCode = 400, name = 'ValidationError') => {
     return error;
 };
 
+const getLegacyUserId = (user) => user?.legacyUserId ?? user?.id;
+
 const sanitizeOriginalName = (name) => {
     let filename = String(name || '').trim();
     filename = path.basename(filename);
@@ -241,7 +243,7 @@ const uploadProcessAttachment = async (req, processId, tipoLabel) => {
             `INSERT INTO anexos (processo_id, atividade_id, tipo, nome_arquivo, caminho_arquivo, nome_armazenado, tamanho_bytes, mime_type, hash_sha256, enviado_por, descricao, data_envio)
              VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
              RETURNING id, tipo, nome_arquivo, tamanho_bytes, mime_type, enviado_por, descricao, data_envio`,
-            [processId, tipo, originalName, storedName, storedName, req.file.size, expectedMime, hashSha256, req.user.id, descricao]
+            [processId, tipo, originalName, storedName, storedName, req.file.size, expectedMime, hashSha256, getLegacyUserId(req.user), descricao]
         );
 
         const attachment = result.rows[0];
@@ -250,7 +252,7 @@ const uploadProcessAttachment = async (req, processId, tipoLabel) => {
             `INSERT INTO logs (usuario_id, acao, tabela_afetada, id_registro, valores_novos, endereco_ip, user_agent)
              VALUES ($1, $2, $3, $4, $5, $6, $7)`,
             [
-                req.user.id,
+                getLegacyUserId(req.user),
                 'UPLOAD_ANEXO_PROCESSO',
                 'anexos',
                 attachment.id,
@@ -295,7 +297,7 @@ const getProcessAttachmentForDownload = async (req, processId, attachmentId) => 
         `INSERT INTO logs (usuario_id, acao, tabela_afetada, id_registro, valores_novos, endereco_ip, user_agent)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [
-            req.user.id,
+            getLegacyUserId(req.user),
             'DOWNLOAD_ANEXO_PROCESSO',
             'anexos',
             attachment.id,
@@ -329,14 +331,14 @@ const deleteProcessAttachment = async (req, processId, attachmentId) => {
     try {
         await client.query(
             `UPDATE anexos SET excluido_em = CURRENT_TIMESTAMP, excluido_por = $1 WHERE id = $2`,
-            [req.user.id, attachmentId]
+            [getLegacyUserId(req.user), attachmentId]
         );
 
         await client.query(
             `INSERT INTO logs (usuario_id, acao, tabela_afetada, id_registro, valores_novos, endereco_ip, user_agent)
              VALUES ($1, $2, $3, $4, $5, $6, $7)`,
             [
-                req.user.id,
+                getLegacyUserId(req.user),
                 'EXCLUSAO_ANEXO_PROCESSO',
                 'anexos',
                 attachmentId,
@@ -372,7 +374,7 @@ const uploadAttachment = async (req, processId, activityId) => {
             `INSERT INTO anexos (processo_id, atividade_id, tipo, nome_arquivo, caminho_arquivo, nome_armazenado, tamanho_bytes, mime_type, hash_sha256, enviado_por, descricao, data_envio)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)
              RETURNING id, tipo, nome_arquivo, tamanho_bytes, mime_type, enviado_por, descricao, data_envio`,
-            [processId, activityId, tipo, originalName, storedName, storedName, req.file.size, expectedMime, hashSha256, req.user.id, descricao]
+            [processId, activityId, tipo, originalName, storedName, storedName, req.file.size, expectedMime, hashSha256, getLegacyUserId(req.user), descricao]
         );
 
         const attachment = result.rows[0];
@@ -381,7 +383,7 @@ const uploadAttachment = async (req, processId, activityId) => {
             `INSERT INTO logs (usuario_id, acao, tabela_afetada, id_registro, valores_novos, endereco_ip, user_agent)
              VALUES ($1, $2, $3, $4, $5, $6, $7)`,
             [
-                req.user.id,
+                getLegacyUserId(req.user),
                 'UPLOAD_ANEXO',
                 'anexos',
                 attachment.id,

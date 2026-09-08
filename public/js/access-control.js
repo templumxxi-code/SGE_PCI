@@ -325,6 +325,29 @@
         }
     }
 
+    function normalizeOrganizationLabel(value) {
+        return String(value || '').trim().toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
+
+    function dedupeOrganizationList(items) {
+        const unique = [];
+        const seen = new Map();
+        const list = Array.isArray(items) ? items : [];
+
+        list.forEach((item) => {
+            if (!item || typeof item !== 'object') return;
+            const normalizedName = normalizeOrganizationLabel(item.name || item.title || '');
+            const key = normalizedName || String(item.id || '');
+            if (!key) return;
+            if (!seen.has(key)) {
+                seen.set(key, true);
+                unique.push(item);
+            }
+        });
+
+        return unique;
+    }
+
     function saveOrganizationData(data) {
         const normalized = {
             institutes: [],
@@ -335,13 +358,34 @@
             sectors: []
         };
         const source = data || {};
-        normalized.institutes = Array.isArray(source.institutes) ? source.institutes : [];
-        normalized.regionais = Array.isArray(source.regionais) ? source.regionais : [];
-        normalized.subcoordenações = Array.isArray(source.subcoordenações) ? source.subcoordenações : [];
-        normalized.assessorias = Array.isArray(source.assessorias) ? source.assessorias : [];
-        normalized.nuclei = Array.isArray(source.nuclei) ? source.nuclei : [];
-        normalized.sectors = Array.isArray(source.sectors) ? source.sectors : [];
+        normalized.institutes = dedupeOrganizationList(Array.isArray(source.institutes) ? source.institutes : []);
+        normalized.regionais = dedupeOrganizationList(Array.isArray(source.regionais) ? source.regionais : []);
+        normalized.subcoordenações = dedupeOrganizationList(Array.isArray(source.subcoordenações) ? source.subcoordenações : []);
+        normalized.assessorias = dedupeOrganizationList(Array.isArray(source.assessorias) ? source.assessorias : []);
+        normalized.nuclei = dedupeOrganizationList(Array.isArray(source.nuclei) ? source.nuclei : []);
+        normalized.sectors = dedupeOrganizationList(Array.isArray(source.sectors) ? source.sectors : []);
         localStorage.setItem(STORAGE_KEYS.organization, JSON.stringify(normalized));
+    }
+
+    function removeOrganizationItem(type, itemId) {
+        const organization = getStoredOrganizationData();
+        const keyMap = {
+            INSTITUTO: 'institutes',
+            REGIONAL: 'regionais',
+            SUBCOORDENACAO: 'subcoordenações',
+            ASSESSORIA: 'assessorias',
+            NUCLEO: 'nuclei',
+            SETOR: 'sectors'
+        };
+        const targetKey = keyMap[String(type || '').toUpperCase()] || null;
+        if (!targetKey) return null;
+        const list = Array.isArray(organization[targetKey]) ? organization[targetKey] : [];
+        const removed = list.find((item) => String(item.id) === String(itemId));
+        if (!removed) return null;
+        const next = list.filter((item) => String(item.id) !== String(itemId));
+        const nextOrganization = { ...organization, [targetKey]: next };
+        saveOrganizationData(nextOrganization);
+        return removed;
     }
 
     function isDemoUser(user) {
@@ -371,7 +415,26 @@
 
     function saveStoredUsers(users) {
         const cleaned = Array.isArray(users) ? users.filter((user) => !isDemoUser(user)) : [];
-        localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(cleaned));
+        const uniqueUsers = [];
+        const seen = new Map();
+        cleaned.forEach((user) => {
+            const key = String(user?.email || user?.id || '').trim().toLowerCase();
+            if (!key) return;
+            if (!seen.has(key)) {
+                seen.set(key, true);
+                uniqueUsers.push(user);
+            }
+        });
+        localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(uniqueUsers));
+    }
+
+    function removeStoredUser(userId) {
+        const users = getStoredUsers();
+        const removed = users.find((user) => String(user.id) === String(userId));
+        if (!removed) return null;
+        const nextUsers = users.filter((user) => String(user.id) !== String(userId));
+        saveStoredUsers(nextUsers);
+        return removed;
     }
 
     function seedDemoData() {
@@ -400,13 +463,10 @@
         const nuclei = [
             { id: 1, name: 'Núcleo de Apoio', parentType: 'INSTITUTO', parentUnitId: 1, managerUserId: null, active: true, observations: '', createdAt: new Date().toISOString() }
         ];
-        const sectors = [
-            { id: 1, name: 'Setor de Apoio', nucleusId: 1, parentUnitId: 1, managerUserId: null, active: true, observations: '', createdAt: new Date().toISOString() }
-        ];
         const users = [
             { id: 1, name: 'NGE', email: 'admin@pci.rn.gov.br', registration: '0001', role: 'NGE_ADMIN', organizationType: 'NGE', organizationUnitId: null, instituteId: null, regionalId: null, advisoryId: null, nucleusId: null, sectorId: null, active: true, observations: 'Usuário administrativo', createdAt: new Date().toISOString() }
         ];
-        const seed = { institutes, regionais, subcoordenações, assessorias, nuclei, sectors };
+        const seed = { institutes, regionais, subcoordenações, assessorias, nuclei, sectors: [] };
         saveOrganizationData(seed);
         saveStoredUsers(users);
         return seed;
@@ -565,6 +625,160 @@
         return canApproveProcess(user, normalizedProcess) || normalizedUser.accessProfileKey === 'NGE_ADMIN';
     }
 
+    function normalizeSearchText(value) {
+        if (value === null || value === undefined) return '';
+        return String(value)
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .trim()
+            .replace(/\s+/g, ' ');
+    }
+
+    function buildProcessSearchIndex(processo) {
+        if (!processo || typeof processo !== 'object') return '';
+
+        const coerce = (...values) => values
+            .flatMap((value) => Array.isArray(value) ? value : [value])
+            .filter((item) => item !== null && item !== undefined && item !== '')
+            .map((item) => String(item))
+            .join(' ');
+
+        const participantNames = Array.isArray(processo.participantes) ? processo.participantes.map((item) => [item?.nome, item?.name, item?.matricula, item?.registration].join(' ')) : [];
+        const teamMembers = Array.isArray(processo.teamMembers) ? processo.teamMembers.map((item) => [item?.nome, item?.name, item?.matricula, item?.registration, item?.setor].join(' ')) : [];
+        const indicatorNames = Array.isArray(processo.indicadores) ? processo.indicadores.map((item) => [item?.nome, item?.name, item?.descricao, item?.description, item?.responsavel, item?.responsavel_nome].join(' ')) : [];
+        const activityNames = Array.isArray(processo.atividades) ? processo.atividades.map((item) => [item?.nome, item?.title, item?.codigo, item?.code].join(' ')) : [];
+
+        const text = coerce(
+            processo.nome,
+            processo.name,
+            processo.numero_processo,
+            processo.seiNumber,
+            processo.sei_number,
+            processo.macroprocesso,
+            processo.macroprocesso_nome,
+            processo.macroProcesso,
+            processo.responsavel_nome,
+            processo.responsavel,
+            processo.setor_nome,
+            processo.nucleo_nome,
+            processo.unidade_nome,
+            processo.instituto_nome,
+            processo.regional_nome,
+            processo.assessoria_nome,
+            processo.status_fase,
+            processo.currentPhase,
+            processo.fase_bpm,
+            processo.descricao,
+            processo.observacoes,
+            processo.opportunidade_melhoria,
+            processo.contramedida,
+            processo.controle,
+            participantNames,
+            teamMembers,
+            indicatorNames,
+            activityNames,
+            Array.isArray(processo.phases) ? processo.phases.map((phase) => [phase?.name, phase?.fase, phase?.descricao].join(' ')) : [],
+            Array.isArray(processo.checklists) ? processo.checklists.map((checklist) => [checklist?.nome, checklist?.titulo, checklist?.descricao].join(' ')) : []
+        );
+
+        return normalizeSearchText(text);
+    }
+
+    function applyDashboardFilters(processes, filters = {}, user = null) {
+        const visibleProcesses = getVisibleProcesses(user || {}, Array.isArray(processes) ? processes : []);
+        const normalizedFilters = filters || {};
+        const searchText = normalizeSearchText(normalizedFilters.search || normalizedFilters.q || normalizedFilters.busca || '');
+        const unitType = normalizeSearchText(normalizedFilters.unitType || normalizedFilters.tipoUnidade || '');
+        const phase = normalizeSearchText(normalizedFilters.phase || normalizedFilters.fase || '');
+        const status = normalizeSearchText(normalizedFilters.status || normalizedFilters.statusProcesso || '');
+        const responsibleId = normalizedFilters.responsibleId || normalizedFilters.responsavelId || normalizedFilters.userId || '';
+        const processId = normalizedFilters.processId || normalizedFilters.processoId || '';
+        const unitId = normalizedFilters.unitId || normalizedFilters.unidadeId || '';
+        const nucleusId = normalizedFilters.nucleusId || normalizedFilters.nucleoId || '';
+        const sectorId = normalizedFilters.sectorId || normalizedFilters.setorId || '';
+
+        return visibleProcesses.filter((processo) => {
+            const normalizedProcess = normalizeProcessAccessStructure(processo);
+            const phaseCandidates = [
+                normalizedProcess.currentPhase,
+                normalizedProcess.status_fase,
+                normalizedProcess.fase_bpm,
+                normalizedProcess.phase,
+                normalizedProcess.current_phase,
+                normalizedProcess.phaseName,
+                normalizedProcess.status
+            ].map((value) => normalizeSearchText(value));
+            const statusCandidates = [
+                normalizedProcess.currentApprovalStatus,
+                normalizedProcess.status,
+                normalizedProcess.status_processo,
+                normalizedProcess.status_fase,
+                normalizedProcess.currentPhase,
+                normalizedProcess.phase,
+                normalizedProcess.current_phase,
+                normalizedProcess.phaseName
+            ].map((value) => normalizeSearchText(value));
+
+            if (searchText) {
+                const index = buildProcessSearchIndex(normalizedProcess);
+                if (!index.includes(searchText)) return false;
+            }
+
+            if (unitType && unitType !== 'todos' && unitType !== 'todas') {
+                const processType = normalizeSearchText(normalizedProcess.organizationType || normalizedProcess.unitType || normalizedProcess.tipo_unidade || '');
+                if (processType !== unitType) return false;
+            }
+
+            if (unitId) {
+                const values = [normalizedProcess.instituteId, normalizedProcess.regionalId, normalizedProcess.advisoryId, normalizedProcess.nucleusId, normalizedProcess.sectorId, normalizedProcess.organizationUnitId].map((value) => String(value || ''));
+                if (!values.includes(String(unitId))) return false;
+            }
+
+            if (nucleusId && String(normalizedProcess.nucleusId || '') !== String(nucleusId)) return false;
+            if (sectorId && String(normalizedProcess.sectorId || '') !== String(sectorId)) return false;
+            if (processId && String(normalizedProcess.id || '') !== String(processId)) return false;
+            if (responsibleId && String(normalizedProcess.responsibleId || normalizedProcess.responsavel_id || '') !== String(responsibleId)) return false;
+            if (phase && !phaseCandidates.includes(phase)) return false;
+            if (status && !(statusCandidates.includes(status) || phaseCandidates.includes(status))) return false;
+
+            if (normalizedFilters.macroprocesso) {
+                const macro = normalizeSearchText(normalizedProcess.macroprocesso || normalizedProcess.macroprocesso_nome || '');
+                if (macro && macro !== normalizeSearchText(normalizedFilters.macroprocesso)) return false;
+            }
+
+            if (normalizedFilters.checklist) {
+                const completion = (() => {
+                    const checklistEntries = Array.isArray(normalizedProcess.checklists) ? normalizedProcess.checklists : [];
+                    if (!checklistEntries.length) return 0;
+                    const completed = checklistEntries.filter((item) => item?.concluido === true || item?.status === 'concluido' || item?.status === 'Concluído').length;
+                    return Math.round((completed / checklistEntries.length) * 100);
+                })();
+                const checklistValue = String(normalizedFilters.checklist).toLowerCase();
+                if (checklistValue === '100' || checklistValue === '100%') {
+                    if (completion !== 100) return false;
+                } else if (checklistValue === 'parcial') {
+                    if (completion <= 0 || completion >= 100) return false;
+                } else if (checklistValue === 'nao-iniciado') {
+                    if (completion !== 0) return false;
+                }
+            }
+
+            if (normalizedFilters.metaStatus) {
+                const metaStatus = normalizeSearchText(normalizedFilters.metaStatus);
+                const indicators = Array.isArray(normalizedProcess.indicadores) ? normalizedProcess.indicadores : [];
+                if (indicators.length) {
+                    const values = indicators.map((indicator) => normalizeSearchText(indicator?.situacao || indicator?.status || indicator?.targetStatus || ''));
+                    if (metaStatus && !values.some((value) => value === metaStatus)) return false;
+                } else if (metaStatus && metaStatus !== 'sem-indicadores') {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+    }
+
     function getVisibleProcesses(user, processes) {
         const processList = Array.isArray(processes) ? processes : [];
         const normalizedUser = normalizeUser(user);
@@ -579,59 +793,8 @@
     }
 
     function getDashboardFilteredProcesses(processes, user, filters = {}) {
-        const visibleProcesses = getVisibleProcesses(user, processes);
-        const scope = getDashboardScope(user);
-        const normalizedFilters = filters || {};
-
-        return visibleProcesses.filter((processo) => {
-            const normalizedProcess = normalizeProcessAccessStructure(processo);
-            if (!scope.unrestricted) {
-                const processMatchesScope = (() => {
-                    if (scope.organizationType === 'INSTITUTO') {
-                        return String(normalizedProcess.instituteId || normalizedProcess.organizationUnitId || '').trim() === String(scope.instituteId || scope.organizationUnitId || '').trim();
-                    }
-                    if (scope.organizationType === 'REGIONAL') {
-                        return String(normalizedProcess.regionalId || normalizedProcess.organizationUnitId || '').trim() === String(scope.regionalId || scope.organizationUnitId || '').trim();
-                    }
-                    if (scope.organizationType === 'ASSESSORIA') {
-                        return String(normalizedProcess.advisoryId || normalizedProcess.organizationUnitId || '').trim() === String(scope.advisoryId || scope.organizationUnitId || '').trim();
-                    }
-                    if (scope.organizationType === 'NUCLEO') {
-                        return String(normalizedProcess.nucleusId || normalizedProcess.organizationUnitId || '').trim() === String(scope.nucleusId || scope.organizationUnitId || '').trim();
-                    }
-                    if (scope.organizationType === 'SETOR') {
-                        return String(normalizedProcess.sectorId || normalizedProcess.organizationUnitId || '').trim() === String(scope.sectorId || scope.organizationUnitId || '').trim();
-                    }
-                    return true;
-                })();
-                if (!processMatchesScope) return false;
-            }
-
-            if (normalizedFilters.unitType && normalizedFilters.unitType !== 'TODAS') {
-                const expectedType = String(normalizedFilters.unitType).toUpperCase();
-                const processType = String(normalizedProcess.organizationType || '').toUpperCase();
-                if (processType !== expectedType) return false;
-            }
-            if (normalizedFilters.unitId) {
-                const unitValue = String(normalizedFilters.unitId).trim();
-                const processUnitValue = [normalizedProcess.instituteId, normalizedProcess.regionalId, normalizedProcess.advisoryId, normalizedProcess.nucleusId, normalizedProcess.sectorId, normalizedProcess.organizationUnitId].find((value) => String(value || '').trim() === unitValue);
-                if (!processUnitValue) return false;
-            }
-            if (normalizedFilters.userId) {
-                const userValue = String(normalizedFilters.userId).trim();
-                if (String(normalizedProcess.createdByUserId || '').trim() !== userValue) return false;
-            }
-            if (normalizedFilters.status) {
-                const statusValue = String(normalizedFilters.status).toUpperCase();
-                if (String(normalizedProcess.currentApprovalStatus || '').toUpperCase() !== statusValue) return false;
-            }
-            if (normalizedFilters.phase) {
-                const phaseValue = String(normalizedFilters.phase).toLowerCase();
-                const hasPhase = Array.isArray(normalizedProcess.phases) && normalizedProcess.phases.some((phase) => String(phase?.name || '').toLowerCase() === phaseValue);
-                if (!hasPhase) return false;
-            }
-            return true;
-        });
+        const scopeFiltered = getVisibleProcesses(user, processes);
+        return applyDashboardFilters(scopeFiltered, filters, user);
     }
 
     function filterVisibleIndicators(user, indicators) {
@@ -653,6 +816,53 @@
             if (normalizedUser.accessProfileKey === 'NGE_ADMIN') return true;
             return String(processo.currentApprovalRole || '').toUpperCase() === String(normalizedUser.accessProfileKey).toUpperCase();
         });
+    }
+
+    function getApprovalQueueForUser(user, processes = null) {
+        const normalizedUser = normalizeUser(user);
+        const processList = Array.isArray(processes) ? processes : (safeParseJson(localStorage.getItem('sge_pci_processos'), []));
+
+        return (Array.isArray(processList) ? processList : [])
+            .map(normalizeProcessAccessStructure)
+            .filter((processo) => {
+                if (!processo || processo.active === false) return false;
+                if (!canViewProcess(normalizedUser, processo)) return false;
+
+                const status = String(processo.currentApprovalStatus || 'RASCUNHO').toUpperCase();
+                if (['HOMOLOGADO', 'ARQUIVADO', 'RASCUNHO'].includes(status)) return false;
+
+                const expectedRole = String(processo.currentApprovalRole || getCurrentApprovalStep(processo) || '').toUpperCase();
+                const profileKey = String(normalizedUser.accessProfileKey || '').toUpperCase();
+
+                if (profileKey === 'NGE_ADMIN') return true;
+                if (status === 'DEVOLVIDO_PARA_CORRECAO') {
+                    return String(processo.createdByUserId || '').trim() === String(normalizedUser.id || '').trim() || profileKey === expectedRole;
+                }
+                return profileKey === expectedRole;
+            })
+            .sort((a, b) => {
+                const order = {
+                    'AGUARDANDO_CHEFE_SETOR': 1,
+                    'AGUARDANDO_CHEFE_NUCLEO': 2,
+                    'AGUARDANDO_SUBCOORDENADOR_INSTITUTO': 3,
+                    'AGUARDANDO_DIRETOR_INSTITUTO': 4,
+                    'AGUARDANDO_SUBCOORDENADOR_REGIONAL': 5,
+                    'AGUARDANDO_ASSESSOR': 6,
+                    'DEVOLVIDO_PARA_CORRECAO': 99
+                };
+                return (order[String(a.currentApprovalStatus || '').toUpperCase()] ?? 98) - (order[String(b.currentApprovalStatus || '').toUpperCase()] ?? 98);
+            });
+    }
+
+    function getApprovalQueueMetrics(user, processes = null) {
+        const processList = Array.isArray(processes) ? processes : (safeParseJson(localStorage.getItem('sge_pci_processos'), []));
+        const queue = getApprovalQueueForUser(user, processList);
+        const normalizedUser = normalizeUser(user);
+        const visible = (Array.isArray(processList) ? processList : []).map(normalizeProcessAccessStructure).filter((processo) => canViewProcess(normalizedUser, processo));
+        const pendencias = queue.length;
+        const revisoes = visible.filter((processo) => String(processo.currentApprovalStatus || '').toUpperCase() === 'DEVOLVIDO_PARA_CORRECAO').length;
+        const homologados = visible.filter((processo) => String(processo.currentApprovalStatus || '').toUpperCase() === 'HOMOLOGADO').length;
+        return { pendencias, revisoes, homologados, total: visible.length };
     }
 
     function getProfileOptionsForLogin() {
@@ -864,8 +1074,10 @@
         getDashboardScope,
         getStoredOrganizationData,
         saveOrganizationData,
+        removeOrganizationItem,
         getStoredUsers,
         saveStoredUsers,
+        removeStoredUser,
         seedDemoData,
         normalizeProcessAccessStructure,
         getApprovalStatusLabel,
@@ -880,10 +1092,15 @@
         getVisibleProcesses,
         filterVisibleProcesses,
         getDashboardFilteredProcesses,
+        normalizeSearchText,
+        buildProcessSearchIndex,
+        applyDashboardFilters,
         filterVisibleIndicators,
         getScopeSummary,
         getPendingApprovals,
         getProfileOptionsForLogin,
+        getApprovalQueueForUser,
+        getApprovalQueueMetrics,
         saveCurrentUser,
         getCurrentUser,
         getAllNotifications,

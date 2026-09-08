@@ -138,6 +138,159 @@
     }
 }
 
+@media (max-width: 760px) {
+    .login-section.active {
+        align-items: flex-start;
+        overflow-x: hidden;
+        padding: 14px;
+    }
+
+    .login-shell {
+        grid-template-columns: 1fr;
+        width: 100%;
+        min-height: auto;
+    }
+
+    .login-presentation {
+        padding: 26px 22px 22px;
+        border-right: 0;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+    }
+
+    .login-presentation::after {
+        display: none;
+    }
+
+    .login-presentation h2 {
+        font-size: 1.8rem;
+    }
+
+    .presentation-text {
+        margin-bottom: 20px;
+        font-size: 0.8rem;
+    }
+
+    .feature-list {
+        gap: 10px;
+    }
+
+    .feature-item {
+        padding: 12px;
+    }
+
+    .feature-item:nth-child(3) {
+        display: none;
+    }
+
+    .login-box {
+        min-width: 0;
+        padding: 30px 22px;
+    }
+}
+
+/* Responsividade do login em zoom alto: a viewport CSS fica menor. */
+.login-section,
+.login-section * {
+    min-width: 0;
+}
+
+.login-section.active {
+    min-height: 100vh;
+    height: auto;
+    padding: clamp(16px, 3vw, 32px);
+}
+
+.login-container {
+    width: min(1180px, calc(100vw - 32px));
+    max-width: 1180px;
+    margin: 0 auto;
+}
+
+.login-shell {
+    width: 100%;
+    max-width: 100%;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+}
+
+.login-presentation,
+.login-box,
+.login-form,
+.form-group,
+.password-input-group {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.login-form input,
+.login-form select,
+.login-form button,
+.password-input-group input {
+    max-width: 100%;
+}
+
+.password-input-group input {
+    min-width: 0;
+}
+
+@media (max-width: 1100px) {
+    .login-section.active {
+        padding: 20px;
+    }
+
+    .login-container {
+        width: min(980px, calc(100vw - 40px));
+    }
+
+    .login-presentation,
+    .login-box {
+        padding: clamp(24px, 4vw, 44px);
+    }
+
+    .login-presentation h2 {
+        font-size: clamp(1.8rem, 4vw, 2.8rem);
+    }
+}
+
+@media (max-width: 900px) {
+    .login-section.active {
+        align-items: flex-start;
+        overflow-x: hidden;
+    }
+
+    .login-container {
+        width: min(620px, calc(100vw - 32px));
+    }
+
+    .login-shell {
+        grid-template-columns: minmax(0, 1fr);
+        min-height: auto;
+    }
+
+    .login-box {
+        order: -1;
+    }
+
+    .login-presentation {
+        padding: 26px clamp(22px, 5vw, 42px);
+        border-right: 0;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+    }
+
+    .login-presentation::after {
+        display: none;
+    }
+
+    .login-box {
+        padding: clamp(26px, 5vw, 44px);
+    }
+}
+
+@media (max-height: 750px) {
+    .login-section.active {
+        align-items: flex-start;
+    }
+}
+
 /* ============================================================================
    Smartphone (480px)
    ============================================================================ */
@@ -272,6 +425,39 @@
 
     .login-box {
         padding: var(--spacing-md);
+    }
+
+    .login-section.active {
+        align-items: flex-start;
+        padding: 18px;
+    }
+
+    .login-shell {
+        grid-template-columns: 1fr;
+        min-height: auto;
+    }
+
+    .login-presentation {
+        padding: 30px 24px 24px;
+        border-right: 0;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+    }
+
+    .login-presentation h2 {
+        font-size: 2rem;
+    }
+
+    .presentation-text {
+        margin-bottom: 22px;
+        font-size: 0.84rem;
+    }
+
+    .feature-list .feature-item:nth-child(3) {
+        display: none;
+    }
+
+    .login-box {
+        padding: 32px 24px;
     }
 
     .login-header h1 {

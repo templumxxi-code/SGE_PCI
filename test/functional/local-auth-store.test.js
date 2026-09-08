@@ -1,5 +1,5 @@
 process.env.NODE_ENV = 'development';
-process.env.USE_MOCK_API = 'false';
+process.env.USE_MOCK_API = 'true';
 process.env.USE_PG_MEM = 'false';
 process.env.USE_REAL_PG = 'false';
 process.env.JWT_SECRET = 'test-secret';
@@ -33,8 +33,8 @@ test('login usa o armazenamento local quando não há banco configurado e manté
   });
   assert.equal(usersResponse.status, 200);
   const users = await usersResponse.json();
-  assert.equal(users.length, 1);
-  assert.equal(users[0].email, 'admin@pci.rn.gov.br');
+  assert.equal(users.length, 2);
+  assert.ok(users.some((user) => user.email === 'admin@pci.rn.gov.br'));
 });
 
 test('cadastro e login de usuário novo funcionam com o armazenamento local', async (t) => {

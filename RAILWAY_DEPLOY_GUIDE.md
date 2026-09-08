@@ -106,8 +106,9 @@ psql -U user -h host -d dbname -f database/schema.sql
 # 3. Executar todo o conteúdo
 ```
 
-### 5.3 Seed de Dados (Opcional)
-Para popular dados de teste:
+### 5.3 Seed de Dados (Somente desenvolvimento)
+Nao execute este seed em producao. Ele contem dados e credenciais de teste.
+Use somente em um banco local descartavel:
 ```bash
 psql -U user -h host -d dbname -f database/seed.sql
 ```

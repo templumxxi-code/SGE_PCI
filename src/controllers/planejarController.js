@@ -18,6 +18,8 @@ const getUsuarioSetorId = async (usuarioId) => {
     return usuario ? usuario.setor_id : null;
 };
 
+const getLegacyUserId = (usuario) => usuario?.legacyUserId ?? usuario?.id;
+
 const validarAcessoProcesso = async (processoId, usuario) => {
     const processo = await queryOne(
         'SELECT id, setor_id FROM processos WHERE id = $1',
@@ -46,7 +48,7 @@ const getOrCreatePlanejar = async (processoId, usuario) => {
 
     const created = await queryOne(
         `INSERT INTO planejar (processo_id, responsavel_id) VALUES ($1, $2) RETURNING *`,
-        [processoId, usuario.id]
+        [processoId, getLegacyUserId(usuario)]
     );
 
     return created;
@@ -162,7 +164,7 @@ const updatePlanejar = async (processoId, body, usuario) => {
     await query(
         `INSERT INTO logs (usuario_id, acao, tabela_afetada, id_registro, valores_novos)
          VALUES ($1, 'Atualizar Planejar', 'planejar', $2, $3)`,
-        [usuario.id, updated.id, JSON.stringify(normalizePlanejarRow(updated))]
+        [getLegacyUserId(usuario), updated.id, JSON.stringify(normalizePlanejarRow(updated))]
     );
 
     return normalizePlanejarRow(updated);
@@ -479,7 +481,7 @@ const submitPlanejar = async (processoId, body, usuario) => {
     await query(
         `INSERT INTO logs (usuario_id, acao, tabela_afetada, id_registro)
          VALUES ($1, 'Enviar para Validacao', 'planejar', $2)`,
-        [usuario.id, updated.id]
+        [getLegacyUserId(usuario), updated.id]
     );
 
     return normalizePlanejarRow(updated);
@@ -495,14 +497,14 @@ const approvePlanejar = async (processoId, usuario) => {
 
     const updated = await queryOne(
         `UPDATE planejar SET status = 'APROVADA', aprovado_por = $1, aprovado_em = CURRENT_TIMESTAMP, atualizado_em = CURRENT_TIMESTAMP WHERE processo_id = $2 RETURNING *`,
-        [usuario.id, processoId]
+        [getLegacyUserId(usuario), processoId]
     );
 
     // Registrar na auditoria
     await query(
         `INSERT INTO logs (usuario_id, acao, tabela_afetada, id_registro)
          VALUES ($1, 'Aprovar Planejar', 'planejar', $2)`,
-        [usuario.id, updated.id]
+        [getLegacyUserId(usuario), updated.id]
     );
 
     return normalizePlanejarRow(updated);
@@ -530,7 +532,7 @@ const rejectPlanejar = async (processoId, body, usuario) => {
     await query(
         `INSERT INTO logs (usuario_id, acao, tabela_afetada, id_registro)
          VALUES ($1, 'Devolver para Correcao', 'planejar', $2)`,
-        [usuario.id, updated.id]
+        [getLegacyUserId(usuario), updated.id]
     );
 
     return normalizePlanejarRow(updated);

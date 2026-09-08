@@ -2,6 +2,7 @@
 // Mock API Routes para execução local sem banco de dados
 // ============================================================================
 
+const crypto = require('crypto');
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
@@ -12,6 +13,7 @@ const mockData = require('../mockData');
 const { users, setores, macroprocessos, processos, indicadores, alerts, logs, atividades, generateId } = mockData;
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10485760 } }).single('file');
+const mockJwtSecret = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
 
 const multerHandler = (req, res, next) => {
     upload(req, res, (err) => {
@@ -66,7 +68,7 @@ const createToken = (usuario) => {
             perfil: usuario.perfil,
             setor_id: usuario.setor_id
         },
-        process.env.JWT_SECRET || 'local-mock-secret',
+        mockJwtSecret,
         { expiresIn: '24h' }
     );
 };
@@ -200,6 +202,8 @@ router.post('/auth/registrar', verifyToken, requireAdmin, (req, res) => {
         registration,
         organizationType,
         organizationUnitId,
+        lotacaoType,
+        lotacaoId,
         instituteId,
         regionalId,
         advisoryId,
@@ -234,6 +238,15 @@ router.post('/auth/registrar', verifyToken, requireAdmin, (req, res) => {
         matricula: registration || null,
         setor_id: setor_id || null,
         ativo: active === undefined ? true : Boolean(active)
+        , lotacaoType: lotacaoType || organizationType || null
+        , lotacaoId: lotacaoId || organizationUnitId || sectorId || null
+        , organizationType: organizationType || null
+        , organizationUnitId: organizationUnitId || null
+        , instituteId: instituteId || null
+        , regionalId: regionalId || null
+        , advisoryId: advisoryId || null
+        , nucleusId: nucleusId || null
+        , sectorId: sectorId || null
     };
 
     users.push(newUser);
@@ -245,13 +258,22 @@ router.post('/auth/registrar', verifyToken, requireAdmin, (req, res) => {
         email: newUser.email,
         perfil: newUser.perfil,
         setor_id: newUser.setor_id,
+        lotacaoType: newUser.lotacaoType,
+        lotacaoId: newUser.lotacaoId,
+        organizationType: newUser.organizationType,
+        organizationUnitId: newUser.organizationUnitId,
+        instituteId: newUser.instituteId,
+        regionalId: newUser.regionalId,
+        advisoryId: newUser.advisoryId,
+        nucleusId: newUser.nucleusId,
+        sectorId: newUser.sectorId,
         setor_nome: getSetorNome(newUser.setor_id),
         ativo: newUser.ativo
     });
 });
 
 router.get('/auth/usuarios', verifyToken, requireAdmin, (req, res) => {
-    const result = users.map(u => ({ id: u.id, nome: u.nome, email: u.email, perfil: u.perfil, setor_id: u.setor_id, setor_nome: getSetorNome(u.setor_id), ativo: u.ativo }));
+    const result = users.map(u => ({ ...u, id: u.id, nome: u.nome, email: u.email, perfil: u.perfil, setor_id: u.setor_id, setor_nome: getSetorNome(u.setor_id), ativo: u.ativo }));
     res.json(result);
 });
 
@@ -365,12 +387,9 @@ router.post('/auth/solicitar-reset-senha', (req, res) => {
         expiresAt
     });
 
-    // Log para desenvolvimento
-    console.log(`[Reset Senha] Token gerado para ${usuario.email}: ${token}`);
-
     res.json({
         message: 'E-mail de recuperação enviado com sucesso',
-        token, // Para dev - em prod seria apenas no email
+        token,
         resetLink: `${req.protocol}://${req.get('host')}/?reset=${token}`
     });
 });
@@ -411,8 +430,6 @@ router.post('/auth/reset-senha', (req, res) => {
 
     usuario.senha = novaSenha;
     resetTokens.delete(token);
-
-    console.log(`[Reset Senha] Senha redefinida para ${usuario.email}`);
 
     res.json({
         message: 'Senha redefinida com sucesso',
@@ -1036,7 +1053,12 @@ router.get('/reports/processos/pdf', verifyToken, async (req, res, next) => {
         console.log('[PDF] Iniciando geração de relatório de processos');
         const PDFGenerator = require('../services/pdfGenerator');
         
-        let dados = processos.filter(isActiveProcess).filter(hasValidProcessReference);
+        let dados = processos.filter(isActiveProcess).filter(hasValidProcessReference).map(processo => ({
+            ...processo,
+            setor_nome: setores.find(setor => setor.id === processo.setor_id)?.nome,
+            macroprocesso_nome: macroprocessos.find(item => item.id === processo.macroprocesso_id)?.nome,
+            responsavel_nome: users.find(user => user.id === processo.responsavel_id)?.nome
+        }));
         console.log(`[PDF] Processos filtrados: ${dados.length}`);
         
         // Aplicar filtros se fornecidos
@@ -1065,11 +1087,12 @@ router.get('/reports/processos/pdf', verifyToken, async (req, res, next) => {
 
         // Gerar PDF
         console.log('[PDF] Gerando PDF buffer...');
-        const pdfBuffer = await PDFGenerator.gerarRelatarioProcessos(dados, totais, req.query);
+        const pdfBuffer = await PDFGenerator.gerarRelatarioProcessos(dados, totais, req.query, { usuario_nome: req.user.nome, perfil: req.user.perfil });
         console.log(`[PDF] PDF gerado com sucesso: ${pdfBuffer.length} bytes`);
 
         // Enviar PDF
         res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
         res.setHeader('Content-Disposition', `attachment; filename="relatorio_processos_${new Date().getTime()}.pdf"`);
         res.send(pdfBuffer);
         console.log('[PDF] PDF enviado ao cliente');
@@ -1088,7 +1111,11 @@ router.get('/reports/indicadores/pdf', verifyToken, async (req, res, next) => {
     try {
         const PDFGenerator = require('../services/pdfGenerator');
         
-        let dados = [...indicadores];
+        let dados = indicadores.map(indicador => ({
+            ...indicador,
+            processo_nome: processos.find(processo => processo.id === indicador.processo_id)?.nome,
+            setor_nome: setores.find(setor => setor.id === processos.find(processo => processo.id === indicador.processo_id)?.setor_id)?.nome
+        }));
         
         // Aplicar filtros
         if (req.user.perfil === 'SETOR') {
@@ -1116,10 +1143,11 @@ router.get('/reports/indicadores/pdf', verifyToken, async (req, res, next) => {
         }
 
         // Gerar PDF
-        const pdfBuffer = await PDFGenerator.gerarRelatarioIndicadores(dados, totais, req.query);
+        const pdfBuffer = await PDFGenerator.gerarRelatarioIndicadores(dados, totais, req.query, { usuario_nome: req.user.nome, perfil: req.user.perfil });
 
         // Enviar PDF
         res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
         res.setHeader('Content-Disposition', `attachment; filename="relatorio_indicadores_${new Date().getTime()}.pdf"`);
         res.send(pdfBuffer);
     } catch (error) {
@@ -1135,15 +1163,22 @@ router.get('/reports/logs/pdf', verifyToken, async (req, res, next) => {
     try {
         const PDFGenerator = require('../services/pdfGenerator');
         
-        const dados = req.user.perfil === 'SETOR'
+        const dados = (req.user.perfil === 'SETOR'
             ? logs.filter(log => log.usuario_id === req.user.id)
-            : logs;
+            : logs).map(log => ({
+                ...log,
+                usuario_nome: users.find(user => user.id === log.usuario_id)?.nome,
+                usuario_perfil: users.find(user => user.id === log.usuario_id)?.perfil,
+                processo_nome: log.tabela_afetada === 'processos' ? processos.find(processo => processo.id === log.id_registro)?.nome : undefined,
+                setor_nome: log.tabela_afetada === 'processos' ? setores.find(setor => setor.id === processos.find(processo => processo.id === log.id_registro)?.setor_id)?.nome : undefined
+            }));
 
         // Gerar PDF
-        const pdfBuffer = await PDFGenerator.gerarRelatarioLogs(dados, req.query);
+        const pdfBuffer = await PDFGenerator.gerarRelatarioLogs(dados, req.query, { usuario_nome: req.user.nome, perfil: req.user.perfil });
 
         // Enviar PDF
         res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
         res.setHeader('Content-Disposition', `attachment; filename="relatorio_auditoria_${new Date().getTime()}.pdf"`);
         res.send(pdfBuffer);
     } catch (error) {

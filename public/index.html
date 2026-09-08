@@ -353,6 +353,7 @@
                     <p class="subtitle" id="dashboard-nge-subtitle">Acompanhamento dos processos da Polícia Científica do Rio Grande do Norte</p>
 
                     <div class="nge-dashboard-filters" id="nge-dashboard-filters">
+                        <input type="search" data-nge-search="search" aria-label="Buscar processos no dashboard" placeholder="Buscar processo, responsável, setor..." class="search-input dashboard-search-input">
                         <select data-nge-filter="unitType" aria-label="Categoria institucional"><option value="">Todos</option><option value="INSTITUTO">Institutos</option><option value="REGIONAL">Subcoordenações</option><option value="ASSESSORIA">Assessorias</option></select>
                         <select data-nge-filter="unitId" aria-label="Unidade"><option value="">Todas as unidades</option></select>
                         <select data-nge-filter="nucleusId" aria-label="Núcleo"><option value="">Todos os núcleos</option></select>
@@ -399,6 +400,23 @@
                             </div>
                             <div class="metric-value" data-metric="alertas-criticos-nge">0</div>
                             <button type="button" class="metric-label metric-link" data-action="filter-critical-attention"><i class="fas fa-exclamation"></i> Requerem ação</button>
+                        </div>
+                    </div>
+
+                    <div class="activity-overview" aria-label="Panorama geral das atividades">
+                        <div class="activity-overview-header">
+                            <h3>Panorama das atividades</h3>
+                            <span data-activity-overview-total>0 atividades</span>
+                        </div>
+                        <div class="activity-overview-track" role="img" aria-label="Atividades concluídas, pendentes liberadas e bloqueadas">
+                            <span class="activity-overview-completed" data-activity-overview-segment="completed"></span>
+                            <span class="activity-overview-available" data-activity-overview-segment="available"></span>
+                            <span class="activity-overview-blocked" data-activity-overview-segment="blocked"></span>
+                        </div>
+                        <div class="activity-overview-legend">
+                            <span><i class="activity-overview-dot completed"></i>Concluídas: <strong data-activity-overview-count="completed">0</strong></span>
+                            <span><i class="activity-overview-dot available"></i>Pendentes liberadas: <strong data-activity-overview-count="available">0</strong></span>
+                            <span><i class="activity-overview-dot blocked"></i>Bloqueadas: <strong data-activity-overview-count="blocked">0</strong></span>
                         </div>
                     </div>
 
@@ -546,6 +564,23 @@
                         </div>
                     </div>
 
+                    <div class="activity-overview" aria-label="Panorama geral das atividades">
+                        <div class="activity-overview-header">
+                            <h3>Panorama das atividades</h3>
+                            <span data-activity-overview-total>0 atividades</span>
+                        </div>
+                        <div class="activity-overview-track" role="img" aria-label="Atividades concluídas, pendentes liberadas e bloqueadas">
+                            <span class="activity-overview-completed" data-activity-overview-segment="completed"></span>
+                            <span class="activity-overview-available" data-activity-overview-segment="available"></span>
+                            <span class="activity-overview-blocked" data-activity-overview-segment="blocked"></span>
+                        </div>
+                        <div class="activity-overview-legend">
+                            <span><i class="activity-overview-dot completed"></i>Concluídas: <strong data-activity-overview-count="completed">0</strong></span>
+                            <span><i class="activity-overview-dot available"></i>Pendentes liberadas: <strong data-activity-overview-count="available">0</strong></span>
+                            <span><i class="activity-overview-dot blocked"></i>Bloqueadas: <strong data-activity-overview-count="blocked">0</strong></span>
+                        </div>
+                    </div>
+
                     <div class="charts-container">
                         <div class="chart-card">
                             <h3>Progresso por Fase BPM</h3>
@@ -619,9 +654,7 @@
                             <div class="form-row">
                                 <div class="form-group">
                                     <label for="macroprocesso-select">Macroprocesso *</label>
-                                    <select id="macroprocesso-select" required>
-                                        <option value="">Selecione o macroprocesso</option>
-                                    </select>
+                                    <input type="text" id="macroprocesso-select" placeholder="Digite o macroprocesso" required>
                                 </div>
 
                                 <div class="form-group">
@@ -858,40 +891,34 @@
                                 <h3>Pendências para aprovação</h3>
                                 <i class="fas fa-hourglass-half icon-warning"></i>
                             </div>
-                            <div class="metric-value" data-metric="pendencias-aprovacao">6</div>
+                            <div class="metric-value" data-metric="pendencias-aprovacao">0</div>
                         </div>
                         <div class="metric-card">
                             <div class="metric-header">
                                 <h3>Fluxos em revisão</h3>
                                 <i class="fas fa-route icon-info"></i>
                             </div>
-                            <div class="metric-value" data-metric="fluxos-revisao">3</div>
+                            <div class="metric-value" data-metric="fluxos-revisao">0</div>
                         </div>
                     </div>
 
                     <div class="approval-panel">
                         <div class="approval-list">
                             <h3>Fila de aprovação</h3>
-                            <div class="approval-item">
-                                <strong>Plano de Implementação</strong>
-                                <p>Regional Natal · Enviado para análise</p>
-                                <span class="badge badge-warning">Pendente</span>
-                            </div>
-                            <div class="approval-item">
-                                <strong>Indicadores de Perícia</strong>
-                                <p>Assessoria Técnica · Aguardando validação</p>
-                                <span class="badge badge-info">Em revisão</span>
+                            <div id="approval-queue-list">
+                                <div class="approval-item empty-state">
+                                    <strong>Sem pendências</strong>
+                                    <p>Carregando fila real do fluxo vigente...</p>
+                                </div>
                             </div>
                         </div>
                         <div class="approval-list">
                             <h3>Escopo operacional</h3>
-                            <div class="approval-item">
-                                <strong>Unidades visíveis</strong>
-                                <p>Instituto, Regional, Assessoria, Núcleo e Setor</p>
-                            </div>
-                            <div class="approval-item">
-                                <strong>Regra de bloqueio</strong>
-                                <p>Perfis com escopo restrito não visualizam unidades fora do seu alcance.</p>
+                            <div id="approval-scope-list">
+                                <div class="approval-item">
+                                    <strong>Unidades visíveis</strong>
+                                    <p>Instituto, Regional, Assessoria, Núcleo e Setor conforme perfil do usuário.</p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1037,25 +1064,12 @@
 
                                 <div class="user-form-section">
                                     <h5>Lotação institucional</h5>
-                                    <div class="form-grid two-columns">
-                                        <div class="form-field" id="new-user-organization-type-group">
-                                            <label for="new-user-organization-type">Tipo de unidade</label>
-                                            <select id="new-user-organization-type"></select>
-                                            <small class="field-message" aria-live="polite"></small>
-                                        </div>
-                                        <div class="form-field" id="new-user-unit-group">
-                                            <label for="new-user-unit">Unidade principal</label>
-                                            <select id="new-user-unit"></select>
-                                            <small class="field-message" aria-live="polite"></small>
-                                        </div>
-                                        <div class="form-field" id="new-user-nucleus-group">
-                                            <label for="new-user-nucleus">Núcleo</label>
-                                            <select id="new-user-nucleus"></select>
-                                            <small class="field-message" aria-live="polite"></small>
-                                        </div>
-                                        <div class="form-field" id="new-user-sector-group">
-                                            <label for="new-user-sector">Setor</label>
-                                            <select id="new-user-sector"></select>
+                                    <div class="form-grid one-column">
+                                        <div class="form-field field-required" id="new-user-lotacao-group">
+                                            <label for="new-user-lotacao">Lotação *</label>
+                                            <select id="new-user-lotacao" required aria-required="true">
+                                                <option value="">Selecione a lotação</option>
+                                            </select>
                                             <small class="field-message" aria-live="polite"></small>
                                         </div>
                                     </div>
@@ -1087,14 +1101,8 @@
                                     <select id="user-table-profile-filter">
                                         <option value="">Todos os perfis</option>
                                     </select>
-                                    <select id="user-table-unit-filter">
-                                        <option value="">Todas as unidades</option>
-                                    </select>
-                                    <select id="user-table-nucleus-filter">
-                                        <option value="">Todos os núcleos</option>
-                                    </select>
-                                    <select id="user-table-sector-filter">
-                                        <option value="">Todos os setores</option>
+                                    <select id="user-table-lotacao-filter">
+                                        <option value="">Todas as lotações</option>
                                     </select>
                                     <select id="user-table-status-filter">
                                         <option value="">Todos os status</option>
@@ -1112,16 +1120,14 @@
                                         <th>Matrícula</th>
                                         <th>E-mail</th>
                                         <th>Perfil</th>
-                                        <th>Unidade</th>
-                                        <th>Núcleo</th>
-                                        <th>Setor</th>
+                                        <th>Lotação</th>
                                         <th>Status</th>
                                         <th>Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <tr>
-                                        <td colspan="9" class="text-center">Carregando usuários...</td>
+                                        <td colspan="7" class="text-center">Carregando usuários...</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -1204,6 +1210,7 @@
     <script src="./js/auth.js"></script>
     <script src="./js/utils.js"></script>
     <script src="./js/access-control.js"></script>
+    <script src="./js/api/bpmApi.js"></script>
     <script src="./js/processes.js"></script>
     <script src="./js/indicators.js"></script>
     <script src="./js/dashboard.js"></script>

@@ -242,10 +242,11 @@ router.get('/processos/pdf', verifyToken, async (req, res, next) => {
         }
 
         // Gerar PDF
-        const pdfBuffer = await PDFGenerator.gerarRelatarioProcessos(processos, totais, { data_inicio, data_fim, setor_id });
+        const pdfBuffer = await PDFGenerator.gerarRelatarioProcessos(processos, totais, { data_inicio, data_fim, setor_id }, { usuario_nome: req.user.nome, perfil: req.user.perfil });
 
         // Enviar PDF
         res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
         res.setHeader('Content-Disposition', `attachment; filename="relatorio_processos_${new Date().getTime()}.pdf"`);
         res.send(pdfBuffer);
     } catch (error) {
@@ -326,10 +327,11 @@ router.get('/indicadores/pdf', verifyToken, async (req, res, next) => {
         }
 
         // Gerar PDF
-        const pdfBuffer = await PDFGenerator.gerarRelatarioIndicadores(indicadores, totais, { data_inicio, data_fim });
+        const pdfBuffer = await PDFGenerator.gerarRelatarioIndicadores(indicadores, totais, { data_inicio, data_fim }, { usuario_nome: req.user.nome, perfil: req.user.perfil });
 
         // Enviar PDF
         res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
         res.setHeader('Content-Disposition', `attachment; filename="relatorio_indicadores_${new Date().getTime()}.pdf"`);
         res.send(pdfBuffer);
     } catch (error) {
@@ -347,12 +349,23 @@ router.get('/logs/pdf', verifyToken, async (req, res, next) => {
         const { data_inicio, data_fim } = req.query;
 
         let query_text = `
-            SELECT id, usuario_id, acao, tabela_afetada, id_registro, criado_em
-            FROM auditoria_logs
+            SELECT l.id, l.usuario_id, u.nome AS usuario_nome, u.perfil AS usuario_perfil,
+                   l.acao, l.tabela_afetada, l.id_registro, l.data_acao AS criado_em,
+                   p.nome AS processo_nome, s.nome AS setor_nome
+            FROM logs l
+            LEFT JOIN usuarios u ON u.id = l.usuario_id
+            LEFT JOIN processos p ON l.tabela_afetada = 'processos' AND p.id = l.id_registro
+            LEFT JOIN setores s ON s.id = p.setor_id
             WHERE 1=1
         `;
         const params = [];
         let paramCount = 1;
+
+        if (req.user.perfil === 'SETOR') {
+            query_text += ` AND (u.id = $${paramCount} OR p.setor_id = $${paramCount})`;
+            params.push(req.user.id);
+            paramCount++;
+        }
 
         if (data_inicio) {
             query_text += ` AND criado_em >= $${paramCount}`;
@@ -371,10 +384,11 @@ router.get('/logs/pdf', verifyToken, async (req, res, next) => {
         const logs = await queryMany(query_text, params);
 
         // Gerar PDF
-        const pdfBuffer = await PDFGenerator.gerarRelatarioLogs(logs, { data_inicio, data_fim });
+        const pdfBuffer = await PDFGenerator.gerarRelatarioLogs(logs, { data_inicio, data_fim }, { usuario_nome: req.user.nome, perfil: req.user.perfil });
 
         // Enviar PDF
         res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
         res.setHeader('Content-Disposition', `attachment; filename="relatorio_auditoria_${new Date().getTime()}.pdf"`);
         res.send(pdfBuffer);
     } catch (error) {

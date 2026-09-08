@@ -22,13 +22,16 @@ const multerHandler = (req, res, next) => {
     });
 };
 
+const legacyUserId = (req) => req.user.legacyUserId ?? req.user.id;
+const legacyUser = (req) => ({ ...req.user, id: legacyUserId(req) });
+
 /**
  * GET /api/planejar/:processoId
  * Obter dados da fase Planejar para um processo
  */
 router.get('/processo/:processoId', verifyToken, async (req, res, next) => {
     try {
-        const dados = await planejarController.getPlanejar(parseInt(req.params.processoId), req.user);
+        const dados = await planejarController.getPlanejar(parseInt(req.params.processoId), legacyUser(req));
         res.json(dados);
     } catch (error) {
         next(error);
@@ -42,7 +45,7 @@ router.get('/processo/:processoId', verifyToken, async (req, res, next) => {
 router.post('/processo/:processoId', verifyToken, async (req, res, next) => {
     try {
         const processoId = parseInt(req.params.processoId);
-        const dados = await planejarController.criarProjetoPlanejamento(processoId, req.body, req.user.id, req.user.perfil);
+        const dados = await planejarController.criarProjetoPlanejamento(processoId, req.body, legacyUserId(req), req.user.perfil);
         res.status(201).json(dados);
     } catch (error) {
         next(error);
@@ -56,7 +59,7 @@ router.post('/processo/:processoId', verifyToken, async (req, res, next) => {
 router.put('/processo/:processoId', verifyToken, async (req, res, next) => {
     try {
         const processoId = parseInt(req.params.processoId);
-        const dados = await planejarController.updatePlanejar(processoId, req.body, req.user);
+        const dados = await planejarController.updatePlanejar(processoId, req.body, legacyUser(req));
         res.json(dados);
     } catch (error) {
         next(error);
@@ -70,7 +73,7 @@ router.put('/processo/:processoId', verifyToken, async (req, res, next) => {
 router.post('/processo/:processoId/enviar-validacao', verifyToken, async (req, res, next) => {
     try {
         const processoId = parseInt(req.params.processoId);
-        const dados = await planejarController.submitPlanejar(processoId, req.body, req.user);
+        const dados = await planejarController.submitPlanejar(processoId, req.body, legacyUser(req));
         res.json(dados);
     } catch (error) {
         next(error);
@@ -84,7 +87,7 @@ router.post('/processo/:processoId/enviar-validacao', verifyToken, async (req, r
 router.post('/processo/:processoId/aprovar', verifyToken, async (req, res, next) => {
     try {
         const processoId = parseInt(req.params.processoId);
-        const dados = await planejarController.approvePlanejar(processoId, req.user);
+        const dados = await planejarController.approvePlanejar(processoId, legacyUser(req));
         res.json(dados);
     } catch (error) {
         next(error);
@@ -98,7 +101,7 @@ router.post('/processo/:processoId/aprovar', verifyToken, async (req, res, next)
 router.post('/processo/:processoId/devolver', verifyToken, async (req, res, next) => {
     try {
         const processoId = parseInt(req.params.processoId);
-        const dados = await planejarController.rejectPlanejar(processoId, req.body, req.user);
+        const dados = await planejarController.rejectPlanejar(processoId, req.body, legacyUser(req));
         res.json(dados);
     } catch (error) {
         next(error);

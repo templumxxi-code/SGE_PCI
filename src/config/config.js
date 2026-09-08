@@ -14,16 +14,22 @@ module.exports = {
 
     // Database
     database: {
-        host: process.env.DB_HOST || 'localhost',
-        port: process.env.DB_PORT || 5432,
-        name: process.env.DB_NAME || 'smp_pci',
-        user: process.env.DB_USER || 'postgres',
-        password: process.env.DB_PASSWORD || 'postgres'
+        host: process.env.NODE_ENV === 'production'
+            ? (process.env.DATABASE_HOST || process.env.DB_HOST)
+            : (process.env.DATABASE_HOST || process.env.DB_HOST || '127.0.0.1'),
+        port: process.env.NODE_ENV === 'production'
+            ? (process.env.DATABASE_PORT || process.env.DB_PORT)
+            : (process.env.DATABASE_PORT || process.env.DB_PORT || 5432),
+        name: process.env.NODE_ENV === 'production'
+            ? (process.env.DATABASE_NAME || process.env.DB_NAME)
+            : (process.env.DATABASE_NAME || process.env.DB_NAME || 'smp_pci'),
+        user: process.env.DATABASE_USER || process.env.DB_USER,
+        password: process.env.DATABASE_PASSWORD || process.env.DB_PASSWORD
     },
 
     // JWT
     jwt: {
-        secret: process.env.JWT_SECRET || 'sua_chave_secreta_desenvolvimento',
+        secret: process.env.JWT_SECRET,
         expiresIn: '24h'
     },
 
@@ -41,8 +47,8 @@ module.exports = {
 
     // CORS
     cors: {
-        origin: process.env.NODE_ENV === 'production' 
-            ? 'https://seu-dominio.com'
+        origin: process.env.NODE_ENV === 'production'
+            ? (process.env.CORS_ORIGINS || '').split(',').map((value) => value.trim()).filter(Boolean)
             : '*',
         credentials: true
     },

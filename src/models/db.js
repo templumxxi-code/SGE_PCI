@@ -3,6 +3,7 @@
 // ============================================================================
 
 const bcryptjs = require('bcryptjs');
+const crypto = require('crypto');
 const { Pool } = require('pg');
 let bootstrapTestDatabase;
 // bootstrap-test-db is heavy and must only be loaded in test initialization paths
@@ -17,34 +18,53 @@ let initializationPromise = null;
 
 const isIntegrationTestDatabase = () => {
     const databaseName = (process.env.DB_NAME || '').toLowerCase();
-    return Boolean(process.env.TEST_DATABASE_URL) || process.env.USE_REAL_PG === 'true' || databaseName.includes('test') || databaseName.includes('teste');
+    const testDatabaseUrlEnabled = Boolean(process.env.TEST_DATABASE_URL)
+        && (process.env.NODE_ENV === 'test' || process.env.USE_REAL_PG === 'true');
+    return testDatabaseUrlEnabled || process.env.USE_REAL_PG === 'true' || databaseName.includes('test') || databaseName.includes('teste');
 };
 
 const buildRealPoolConfig = () => {
-    if (process.env.TEST_DATABASE_URL) {
+    if (process.env.NODE_ENV === 'production' && process.env.DATABASE_URL) {
+        return {
+            connectionString: process.env.DATABASE_URL,
+            max: 20,
+            idleTimeoutMillis: 30000,
+            connectionTimeoutMillis: 5000,
+        };
+    }
+
+    const testDatabaseUrlEnabled = Boolean(process.env.TEST_DATABASE_URL)
+        && (process.env.NODE_ENV === 'test' || process.env.USE_REAL_PG === 'true');
+    if (testDatabaseUrlEnabled) {
         try {
             const parsedUrl = new URL(process.env.TEST_DATABASE_URL);
             return {
                 host: parsedUrl.hostname || '127.0.0.1',
                 port: Number(parsedUrl.port || 5432),
-                database: parsedUrl.pathname.replace(/^\/+/, '') || 'smp_pci_test',
-                user: decodeURIComponent(parsedUrl.username) || process.env.DB_USER || 'postgres',
-                password: decodeURIComponent(parsedUrl.password) || process.env.DB_PASSWORD || '',
+                database: parsedUrl.pathname.replace(/^\/+/, '') || process.env.DATABASE_NAME || process.env.DB_NAME || 'smp_pci_test',
+                user: decodeURIComponent(parsedUrl.username) || process.env.DATABASE_USER || process.env.DB_USER || 'postgres',
+                password: decodeURIComponent(parsedUrl.password) || process.env.DATABASE_PASSWORD || process.env.DB_PASSWORD || '',
                 max: 20,
                 idleTimeoutMillis: 30000,
                 connectionTimeoutMillis: 5000,
             };
         } catch (error) {
-            console.warn('TEST_DATABASE_URL inválida, usando DB_*:', error.message);
+            console.warn('TEST_DATABASE_URL invÃ¡lida, usando DB_*:', error.message);
         }
     }
 
     return {
-        host: process.env.DB_HOST || '127.0.0.1',
-        port: Number(process.env.DB_PORT || 5432),
-        database: process.env.DB_NAME || 'smp_pci',
-        user: process.env.DB_USER || 'postgres',
-        password: process.env.DB_PASSWORD || '',
+        host: process.env.NODE_ENV === 'production'
+            ? (process.env.DATABASE_HOST || process.env.DB_HOST)
+            : (process.env.DATABASE_HOST || process.env.DB_HOST || '127.0.0.1'),
+        port: process.env.NODE_ENV === 'production'
+            ? Number(process.env.DATABASE_PORT || process.env.DB_PORT)
+            : Number(process.env.DATABASE_PORT || process.env.DB_PORT || 5432),
+        database: process.env.NODE_ENV === 'production'
+            ? (process.env.DATABASE_NAME || process.env.DB_NAME)
+            : (process.env.DATABASE_NAME || process.env.DB_NAME || 'smp_pci'),
+        user: process.env.DATABASE_USER || process.env.DB_USER || 'postgres',
+        password: process.env.DATABASE_PASSWORD || process.env.DB_PASSWORD || '',
         max: 20,
         idleTimeoutMillis: 30000,
         connectionTimeoutMillis: 5000,
@@ -75,14 +95,18 @@ const seedTestData = async (pool, isPgMem = false) => {
     await pool.query(`INSERT INTO setores (id, nome, descricao) VALUES (1, 'Setor A', 'Setor de teste A'), (2, 'Setor B', 'Setor de teste B');`);
     await pool.query(`INSERT INTO macroprocessos (id, nome, descricao) VALUES (1, 'Macroprocesso Teste', 'Macroprocesso de teste');`);
 
-    const adminHash = await bcryptjs.hash('admin123', 12);
-    const setorHash = await bcryptjs.hash('setor123', 12);
+    const { getTestCredential } = require('../../test/helpers/test-credentials');
+    const adminCred = getTestCredential('admin');
+    const setorCred = getTestCredential('setor');
+
+    const adminHash = await bcryptjs.hash(adminCred.senha, 12);
+    const setorHash = await bcryptjs.hash(setorCred.senha, 12);
     await pool.query(`
         INSERT INTO usuarios (id, nome, email, senha_hash, perfil, setor_id, ativo)
         VALUES
-            (1, 'Admin', 'admin@pci.rn.gov.br', $1, 'NGE', NULL, TRUE),
-            (2, 'Setor', 'setor@pci.rn.gov.br', $2, 'SETOR', 1, TRUE);
-    `, [adminHash, setorHash]);
+            (1, 'Admin', $1, $2, 'NGE', NULL, TRUE),
+            (2, 'Setor', $3, $4, 'SETOR', 1, TRUE);
+    `, [adminCred.email, adminHash, setorCred.email, setorHash]);
 
     await pool.query(`INSERT INTO processos (id, nome, setor_id, macroprocesso_id, status_fase, percentual_conclusao, observacoes) VALUES (1, 'Processo A', 1, 1, 'Planejar', 20, 'Processo do setor A'), (2, 'Processo B', 2, 1, 'Implementar', 45, 'Processo do setor B');`);
     await pool.query(`INSERT INTO subprocessos (id, processo_id, nome, descricao, status_fase, ordem) VALUES (1, 1, 'Subprocesso A', 'Subprocesso do processo A', 'Planejar', 1), (2, 2, 'Subprocesso B', 'Subprocesso do processo B', 'Implementar', 1);`);
@@ -99,6 +123,11 @@ const createTestPool = async () => {
 
     const { newDb } = require('pg-mem');
     const db = newDb();
+    db.public.registerFunction({
+        name: 'gen_random_uuid',
+        returns: 'uuid',
+        implementation: () => crypto.randomUUID()
+    });
     const pgAdapter = db.adapters.createPg();
     const TestPool = pgAdapter.Pool;
     const pool = new TestPool();
@@ -262,8 +291,28 @@ const createTestPool = async () => {
             data_mudanca TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     `);
+    await pool.query(`
+        CREATE TABLE planejar (
+            id SERIAL PRIMARY KEY,
+            processo_id INT NOT NULL REFERENCES processos(id) ON DELETE CASCADE,
+            objetivo TEXT,
+            swot JSONB DEFAULT '[]',
+            cronograma JSONB DEFAULT '[]',
+            equipe JSONB DEFAULT '[]',
+            checklist JSONB DEFAULT '[]',
+            aprovacao_checklist JSONB DEFAULT '[]',
+            status VARCHAR(50) NOT NULL DEFAULT 'NÃO_INICIADA',
+            responsavel_id INT REFERENCES usuarios(id),
+            devolucao_justificativa TEXT,
+            aprovado_por INT REFERENCES usuarios(id),
+            aprovado_em TIMESTAMP,
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    `);
 
     await seedTestData(pool, true);
+    await pool.query("INSERT INTO planejar (processo_id, responsavel_id, status) VALUES (1, 1, 'NÃO_INICIADA');");
 
     const resetAllSequences = async () => {
         const sequenceTableMap = {
@@ -288,6 +337,7 @@ const createTestPool = async () => {
     };
 
     await resetAllSequences();
+    await bootstrapTestDatabase(pool);
     return pool;
 };
 
@@ -332,14 +382,18 @@ const resetTestDatabase = async () => {
         await pool.query(`INSERT INTO setores (id, nome, descricao) VALUES (1, 'Setor A', 'Setor de teste A'), (2, 'Setor B', 'Setor de teste B');`);
         await pool.query(`INSERT INTO macroprocessos (id, nome, descricao) VALUES (1, 'Macroprocesso Teste', 'Macroprocesso de teste');`);
 
-        const adminHash = await bcryptjs.hash('admin123', 12);
-        const setorHash = await bcryptjs.hash('setor123', 12);
+        const { getTestCredential } = require('../../test/helpers/test-credentials');
+        const adminCred = getTestCredential('admin');
+        const setorCred = getTestCredential('setor');
+
+        const adminHash = await bcryptjs.hash(adminCred.senha, 12);
+        const setorHash = await bcryptjs.hash(setorCred.senha, 12);
         await pool.query(`
             INSERT INTO usuarios (id, nome, email, senha_hash, perfil, setor_id, ativo)
             VALUES
-                (1, 'Admin', 'admin@pci.rn.gov.br', $1, 'NGE', NULL, TRUE),
-                (2, 'Setor', 'setor@pci.rn.gov.br', $2, 'SETOR', 1, TRUE);
-        `, [adminHash, setorHash]);
+                (1, 'Admin', $1, $2, 'NGE', NULL, TRUE),
+                (2, 'Setor', $3, $4, 'SETOR', 1, TRUE);
+        `, [adminCred.email, adminHash, setorCred.email, setorHash]);
 
         await pool.query(`INSERT INTO processos (id, nome, setor_id, macroprocesso_id, status_fase, percentual_conclusao, observacoes) VALUES (1, 'Processo A', 1, 1, 'Planejar', 20, 'Processo do setor A'), (2, 'Processo B', 2, 1, 'Implementar', 45, 'Processo do setor B');`);
         await pool.query(`INSERT INTO subprocessos (id, processo_id, nome, descricao, status_fase, ordem) VALUES (1, 1, 'Subprocesso A', 'Subprocesso do processo A', 'Planejar', 1), (2, 2, 'Subprocesso B', 'Subprocesso do processo B', 'Implementar', 1);`);
@@ -356,7 +410,7 @@ const resetTestDatabase = async () => {
                     await pool.query(`SELECT setval('${sequenceName}', $1, true);`, [maxId]);
                 }
             } catch (e) {
-                console.error(`Falha ao ajustar sequência ${sequenceName}:`, e.message);
+                console.error(`Falha ao ajustar sequÃªncia ${sequenceName}:`, e.message);
             }
         };
 
@@ -427,7 +481,7 @@ const resetTestDatabase = async () => {
                 await pool.query(`SELECT setval('${sequenceName}', $1, true);`, [maxId]);
             }
         } catch (e) {
-            console.error(`Falha ao ajustar sequência ${sequenceName}:`, e.message);
+            console.error(`Falha ao ajustar sequÃªncia ${sequenceName}:`, e.message);
         }
     };
 
@@ -452,7 +506,7 @@ const initializePool = async () => {
                 const { Pool: PgPool } = require('pg');
                 activePool = new PgPool(buildRealPoolConfig());
                 activePool.on('error', (err) => {
-                    console.error('Erro na conexão com PostgreSQL:', err);
+                    console.error('Erro na conexÃ£o com PostgreSQL:', err);
                 });
                 // IMPORTANT: Bootstrap is NOT called here. Tests must call initializeTestDatabase() explicitly.
                 // This prevents automatic schema modifications during normal application startup.
@@ -462,7 +516,7 @@ const initializePool = async () => {
                 const { Pool: PgPool } = require('pg');
                 activePool = new PgPool(buildRealPoolConfig());
                 activePool.on('error', (err) => {
-                    console.error('Erro na conexão com PostgreSQL:', err);
+                    console.error('Erro na conexÃ£o com PostgreSQL:', err);
                 });
             }
             return activePool;
@@ -527,10 +581,15 @@ const poolProxy = {
     }
 };
 
+const checkConnection = async () => {
+    await poolProxy.query('SELECT 1');
+    return true;
+};
+
 /**
  * Executar query no banco de dados
  * @param {string} query - Comando SQL
- * @param {array} params - Parâmetros da query
+ * @param {array} params - ParÃ¢metros da query
  * @returns {Promise}
  */
 async function query(text, params = []) {
@@ -538,18 +597,18 @@ async function query(text, params = []) {
     try {
         const result = await poolProxy.query(text, params);
         const duration = Date.now() - start;
-        console.log(`📊 Query executada em ${duration}ms:`, text.substring(0, 50) + '...');
+        console.log(`ðŸ“Š Query executada em ${duration}ms`);
         return result;
     } catch (error) {
-        console.error('❌ Erro na query:', error);
+        console.error('âŒ Erro na query:', error.message);
         throw error;
     }
 }
 
 /**
- * Obter uma única linha
+ * Obter uma Ãºnica linha
  * @param {string} text - Comando SQL
- * @param {array} params - Parâmetros
+ * @param {array} params - ParÃ¢metros
  * @returns {Promise<object>}
  */
 async function queryOne(text, params = []) {
@@ -558,9 +617,9 @@ async function queryOne(text, params = []) {
 }
 
 /**
- * Obter múltiplas linhas
+ * Obter mÃºltiplas linhas
  * @param {string} text - Comando SQL
- * @param {array} params - Parâmetros
+ * @param {array} params - ParÃ¢metros
  * @returns {Promise<array>}
  */
 async function queryMany(text, params = []) {
@@ -569,7 +628,7 @@ async function queryMany(text, params = []) {
 }
 
 /**
- * Iniciar transação
+ * Iniciar transaÃ§Ã£o
  * @returns {Promise<object>}
  */
 async function beginTransaction() {
@@ -584,7 +643,7 @@ async function beginTransaction() {
 }
 
 /**
- * Finalizar transação (commit)
+ * Finalizar transaÃ§Ã£o (commit)
  * @param {object} client
  */
 async function commit(client) {
@@ -596,7 +655,7 @@ async function commit(client) {
 }
 
 /**
- * Reverter transação (rollback)
+ * Reverter transaÃ§Ã£o (rollback)
  * @param {object} client
  */
 async function rollback(client) {
@@ -609,6 +668,7 @@ async function rollback(client) {
 
 module.exports = {
     pool: poolProxy,
+    checkConnection,
     query,
     queryOne,
     queryMany,

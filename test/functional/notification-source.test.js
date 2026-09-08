@@ -63,6 +63,7 @@ function loadNotificationCenter() {
 
   vm.createContext(context);
   vm.runInContext(appCode, context);
+  windowObject.NotificationCenter.ensureCurrentUserNotifications = () => {};
   return { window: windowObject, storage };
 }
 

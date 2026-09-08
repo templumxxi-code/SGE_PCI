@@ -22,7 +22,7 @@ router.get('/', verifyToken, async (req, res, next) => {
             limit: req.query.limit ? parseInt(req.query.limit) : 20
         };
 
-        const processos = await processController.listarProcessos(filtros, req.user.id, req.user.perfil);
+        const processos = await processController.listarProcessos(filtros, req.user.legacyUserId, req.user.perfil);
         res.json(processos);
     } catch (error) {
         next(error);
@@ -35,7 +35,7 @@ router.get('/', verifyToken, async (req, res, next) => {
  */
 router.get('/:id', verifyToken, async (req, res, next) => {
     try {
-        const processo = await processController.obterProcesso(req.params.id, req.user.id, req.user.perfil);
+        const processo = await processController.obterProcesso(req.params.id, req.user.legacyUserId, req.user.perfil);
 
         if (!processo) {
             return res.status(404).json({ error: 'Processo não encontrado' });
@@ -53,7 +53,7 @@ router.get('/:id', verifyToken, async (req, res, next) => {
  */
 router.post('/', verifyToken, async (req, res, next) => {
     try {
-        const processo = await processController.criarProcesso(req.body, req.user.id, req.user.perfil);
+        const processo = await processController.criarProcesso(req.body, req.user.legacyUserId, req.user.perfil);
         res.status(201).json(processo);
     } catch (error) {
         next(error);
@@ -66,7 +66,7 @@ router.post('/', verifyToken, async (req, res, next) => {
  */
 router.put('/:id', verifyToken, async (req, res, next) => {
     try {
-        const processoAtualizado = await processController.atualizarProcesso(req.params.id, req.body, req.user.id, req.user.perfil);
+        const processoAtualizado = await processController.atualizarProcesso(req.params.id, req.body, req.user.legacyUserId, req.user.perfil);
         res.json(processoAtualizado);
     } catch (error) {
         next(error);
@@ -89,14 +89,14 @@ router.delete('/:id', verifyToken, async (req, res, next) => {
             // Verificar senha do usuário atual contra o hash no banco
             const bcryptjs = require('bcryptjs');
             const { queryOne } = require('../models/db');
-            const userRow = await queryOne('SELECT password_hash FROM usuarios WHERE id = $1', [req.user.id]);
+            const userRow = await queryOne('SELECT password_hash FROM usuarios WHERE id = $1', [req.user.legacyUserId]);
             const hash = userRow ? userRow.password_hash || userRow.passwordHash || null : null;
             const senhaValida = hash ? await bcryptjs.compare(String(senha), hash) : false;
             if (!senhaValida) return res.status(403).json({ error: 'Senha inválida' });
         }
 
         const motivo = req.body && req.body.motivo ? String(req.body.motivo).slice(0, 1000) : null;
-        const resultado = await processController.deletarProcesso(req.params.id, req.user.id, req.user.perfil, motivo);
+        const resultado = await processController.deletarProcesso(req.params.id, req.user.legacyUserId, req.user.perfil, motivo);
         res.json(resultado);
     } catch (error) {
         next(error);
@@ -109,7 +109,7 @@ router.delete('/:id', verifyToken, async (req, res, next) => {
  */
 router.get('/:id/indicadores', verifyToken, async (req, res, next) => {
     try {
-        const indicadores = await indicatorController.listarIndicadores(req.params.id, req.user.id, req.user.perfil);
+        const indicadores = await indicatorController.listarIndicadores(req.params.id, req.user.legacyUserId, req.user.perfil);
         res.json(indicadores);
     } catch (error) {
         next(error);
@@ -123,7 +123,7 @@ router.get('/:id/indicadores', verifyToken, async (req, res, next) => {
 router.get('/estatisticas/geral', verifyToken, async (req, res, next) => {
     try {
         const setorId = req.query.setor_id ? parseInt(req.query.setor_id) : null;
-        const estatisticas = await processController.obterEstatisticas(setorId, req.user.id, req.user.perfil);
+        const estatisticas = await processController.obterEstatisticas(setorId, req.user.legacyUserId, req.user.perfil);
         res.json(estatisticas);
     } catch (error) {
         next(error);

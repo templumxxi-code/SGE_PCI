@@ -1,106 +1,23 @@
-// ============================================================================
-// POP Generator Service - Procedimento Operacional Padrão
-// ============================================================================
-// Serviço para gerar Procedimentos Operacionais Padrão em PDF
-// com identidade visual da Polícia Científica do RN
-
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 
 class POPGenerator {
-    /**
-     * Cores da Polícia Científica do RN
-     */
     static get COLORS() {
-        return {
-            primary: '#0052CC',      // Azul principal
-            secondary: '#003A99',    // Azul escuro
-            accent: '#FF6B35',       // Laranja
-            success: '#00B894',      // Verde
-            warning: '#FDCB6E',      // Amarelo
-            danger: '#D63031',       // Vermelho
-            text: '#2C3E50',         // Cinza escuro
-            lightText: '#7F8C8D',    // Cinza claro
-            lightBg: '#ECF0F1',      // Cinza muito claro
-            border: '#BDC3C7'        // Cinza médio
-        };
+        return { bg: '#FFFFFF', text: '#000000', headerBg: '#C9D9F2', border: '#666666' };
     }
 
-    /**
-     * Gerar Procedimento Operacional Padrão em PDF
-     */
-    static gerarPOP(dadosProcesso, dadosAtividades = {}, filtros = {}) {
+    static gerarPOP(dadosProcesso = {}, dadosAtividades = {}) {
         return new Promise((resolve, reject) => {
             try {
-                const doc = new PDFDocument({
-                    size: 'A4',
-                    margin: 50,
-                    bufferPages: true
-                });
-
-                // Buffer para armazenar o PDF
+                const doc = new PDFDocument({ size: 'A4', margin: 0, bufferPages: true, autoFirstPage: false });
                 const chunks = [];
-                doc.on('data', (chunk) => chunks.push(chunk));
-                doc.on('end', () => {
-                    resolve(Buffer.concat(chunks));
-                });
+                doc.on('data', chunk => chunks.push(chunk));
+                doc.on('end', () => resolve(Buffer.concat(chunks)));
                 doc.on('error', reject);
-
-                // Cabeçalho
-                this.adicionarCabecalho(doc, 'PROCEDIMENTO OPERACIONAL PADRÃO - POP');
-
-                // Seção 1: Identificação
-                doc.fontSize(14).font('Helvetica-Bold').fillColor(this.COLORS.primary).text('1. Identificação do Procedimento', { underline: true });
-                doc.moveDown(0.3);
-                this.adicionarSecaoIdentificacao(doc, dadosProcesso);
-
-                doc.moveDown(0.5);
-
-                // Seção 2: Objetivo e Escopo
-                doc.fontSize(14).font('Helvetica-Bold').fillColor(this.COLORS.primary).text('2. Objetivo e Escopo', { underline: true });
-                doc.moveDown(0.3);
-                this.adicionarSecaoObjetivo(doc, dadosProcesso, dadosAtividades);
-
-                doc.moveDown(0.5);
-
-                // Seção 3: Responsabilidades
-                doc.fontSize(14).font('Helvetica-Bold').fillColor(this.COLORS.primary).text('3. Responsabilidades', { underline: true });
-                doc.moveDown(0.3);
-                this.adicionarSecaoResponsabilidades(doc, dadosAtividades);
-
-                doc.moveDown(0.5);
-
-                // Seção 4: Fluxo do Processo
-                doc.fontSize(14).font('Helvetica-Bold').fillColor(this.COLORS.primary).text('4. Fluxo do Processo', { underline: true });
-                doc.moveDown(0.3);
-                this.adicionarSecaoFluxo(doc, dadosAtividades);
-
-                doc.moveDown(0.5);
-
-                // Seção 5: Indicadores
-                doc.fontSize(14).font('Helvetica-Bold').fillColor(this.COLORS.primary).text('5. Indicadores de Desempenho', { underline: true });
-                doc.moveDown(0.3);
-                this.adicionarSecaoIndicadores(doc, dadosAtividades);
-
-                doc.moveDown(0.5);
-
-                // Seção 6: Documentos de Referência
-                doc.fontSize(14).font('Helvetica-Bold').fillColor(this.COLORS.primary).text('6. Documentos de Referência', { underline: true });
-                doc.moveDown(0.3);
-                this.adicionarSecaoDocumentos(doc, dadosAtividades);
-
-                doc.moveDown(0.5);
-
-                // Seção 7: Histórico de Alterações
-                doc.fontSize(14).font('Helvetica-Bold').fillColor(this.COLORS.primary).text('7. Histórico de Alterações', { underline: true });
-                doc.moveDown(0.3);
-                this.adicionarSecaoHistorico(doc, dadosProcesso);
-
-                // Rodapé
-                doc.moveDown(1);
-                this.adicionarRodape(doc);
-
+                const data = this.mapFields(dadosProcesso, dadosAtividades);
+                this.renderPageOne(doc, data);
+                this.renderPageTwo(doc, data);
                 doc.end();
             } catch (error) {
                 reject(error);
@@ -108,188 +25,158 @@ class POPGenerator {
         });
     }
 
-    /**
-     * Adicionar cabeçalho com logo e título
-     */
-    static adicionarCabecalho(doc, titulo) {
-        const logoPath = path.join(__dirname, '../../public/assets/images/logo-sge-pci-removebg-preview.png');
-        
-        // Tenta adicionar logo se existir
-        try {
-            if (fs.existsSync(logoPath)) {
-                doc.image(logoPath, 50, 30, { width: 60, height: 60 });
-            }
-        } catch (error) {
-            console.warn('Logo não encontrada:', logoPath);
+    static value(value, fallback = 'Não informado') {
+        if (value === null || value === undefined) return fallback;
+        if (Array.isArray(value)) {
+            const items = value.map(item => this.value(item, '')).filter(Boolean);
+            return items.length ? items.join('\n') : fallback;
         }
-
-        // Informações institucionais
-        doc.fontSize(14).font('Helvetica-Bold').fillColor(this.COLORS.primary)
-            .text('Polícia Científica do Rio Grande do Norte', 120, 35);
-        
-        doc.fontSize(11).font('Helvetica').fillColor(this.COLORS.secondary)
-            .text('Sistema de Gestão Estratégica - SGE PCI/RN', 120, 52);
-        
-        // Linha separadora
-        doc.moveTo(50, 100).lineTo(545, 100).stroke(this.COLORS.border);
-        
-        // Título do documento
-        doc.fontSize(16).font('Helvetica-Bold').fillColor(this.COLORS.primary)
-            .text(titulo, { align: 'center', top: 110 });
-        
-        doc.moveDown(0.5);
+        if (typeof value === 'object') {
+            return this.value(value.text || value.nome || value.name || value.descricao || value.description, fallback);
+        }
+        const text = String(value).trim();
+        return text || fallback;
     }
 
-    /**
-     * Adicionar seção de identificação
-     */
-    static adicionarSecaoIdentificacao(doc, dadosProcesso) {
-        const data = {
-            'Nome do Processo': dadosProcesso.nome || 'N/A',
-            'Macroprocesso': dadosProcesso.macroprocesso || 'N/A',
-            'Setor/Núcleo': dadosProcesso.setor_nome || `Setor ${dadosProcesso.setor_id}` || 'N/A',
-            'Responsável': dadosProcesso.responsavel_nome || 'N/A',
-            'Data de Criação': dadosProcesso.data_inicio 
-                ? new Date(dadosProcesso.data_inicio).toLocaleDateString('pt-BR') 
-                : 'N/A',
-            'Versão': dadosProcesso.versao || '1.0'
+    static activity(activities, code) {
+        return activities[code] || {};
+    }
+
+    static first(values, fallback = 'Não informado') {
+        for (const item of values) {
+            const text = this.value(item, '');
+            if (text) return text;
+        }
+        return fallback;
+    }
+
+    static date(value) {
+        if (!value) return 'Não informado';
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? this.value(value) : date.toLocaleDateString('pt-BR');
+    }
+
+    static mapFields(process, activities) {
+        const plan = this.activity(activities, 'PLAN_A');
+        const designScope = this.activity(activities, 'DES_A');
+        const designFlow = this.activity(activities, 'DES_B');
+        const designDocs = this.activity(activities, 'DES_F');
+        const processData = process || {};
+        const all = [processData, plan, designScope, designFlow, designDocs];
+        const field = name => all.map(item => item && (item[name] || item.content?.[name]));
+        const attachments = Object.values(activities).flatMap(activity => {
+            const source = activity.attachments || activity.content?.attachments || activity.anexos;
+            return Array.isArray(source) ? source : source ? [source] : [];
+        });
+
+        return {
+            titulo: this.first([processData.nome, processData.name]),
+            area: this.first([processData.area, processData.instituto, processData.regional, processData.assessoria, processData.macroprocesso_nome, processData.macroprocesso]),
+            setor: this.first([processData.setor_nome, processData.setor]),
+            paginas: '2',
+            versao: this.first([processData.versao, processData.version], '1.0'),
+            ultimaRevisao: this.date(processData.ultimaRevisao || processData.data_revisao || processData.atualizado_em || processData.criado_em),
+            finalidade: this.first([processData.finalidade, processData.objetivo, plan.objective, plan.content?.objective, designScope.finalidade, designScope.content?.finalidade]),
+            publicoAlvo: this.first(field('publicoAlvo').concat(field('publico_alvo'))),
+            materialRecomendado: this.first(field('materialRecomendado').concat(field('material_recomendado'))),
+            procedimentosOperacionais: this.first([designFlow.procedimentosOperacionais, designFlow.procedimentos, designFlow.content?.procedimentosOperacionais, designFlow.content?.procedimentos, designDocs.procedimentosOperacionais, designDocs.content?.procedimentosOperacionais]),
+            orientacoes: this.first(field('orientacoes').concat(field('orientações'))),
+            definicoesAbreviaturas: this.first(field('definicoesAbreviaturas').concat(field('definicoes_abreviaturas')).concat(field('definicoes'))),
+            fluxograma: this.first([designFlow.fluxograma, designFlow.fluxogramaToBe, designFlow.fluxograma_to_be, designFlow.content?.fluxograma, designFlow.descricao, designFlow.description, 'Fluxo TO-BE']),
+            anexos: this.first([processData.anexos, processData.attachments, attachments]),
+            elaboradores: this.first([processData.elaboradores, processData.equipe, processData.teamMembers, designDocs.elaboradores, designDocs.content?.elaboradores, processData.responsavel_nome]),
+            revisor: this.first([processData.revisor, processData.reviewer, designDocs.revisor, designDocs.content?.revisor], 'Pendente de revisão'),
+            homologador: this.first([processData.homologador, processData.aprovador, processData.approver, designDocs.homologador, designDocs.content?.homologador], 'Pendente de homologação')
         };
-
-        doc.fontSize(11).font('Helvetica');
-        
-        Object.entries(data).forEach(([chave, valor]) => {
-            doc.fillColor(this.COLORS.text);
-            doc.font('Helvetica-Bold').text(`${chave}: `, { continued: true });
-            doc.font('Helvetica').text(String(valor));
-        });
     }
 
-    /**
-     * Adicionar seção de objetivo
-     */
-    static adicionarSecaoObjetivo(doc, dadosProcesso, dadosAtividades) {
-        doc.fontSize(11).font('Helvetica').fillColor(this.COLORS.text);
-        
-        const objetivo = dadosProcesso.objetivo || dadosAtividades['PLAN_A']?.objective || 'Objetivo não definido';
-        
-        doc.text('Objetivo:', { underline: true });
-        doc.font('Helvetica').text(String(objetivo), { align: 'justify' });
-        
-        doc.moveDown(0.3);
-        
-        const escopo = dadosAtividades['DES_A'] || 'Escopo não definido';
-        doc.text('Escopo:', { underline: true });
-        doc.font('Helvetica').text(String(escopo), { align: 'justify' });
+    static configure(doc) {
+        doc.fillColor(this.COLORS.text).font('Helvetica').fontSize(10);
     }
 
-    /**
-     * Adicionar seção de responsabilidades
-     */
-    static adicionarSecaoResponsabilidades(doc, dadosAtividades) {
-        doc.fontSize(11).font('Helvetica').fillColor(this.COLORS.text);
-        
-        const responsabilidades = [
-            `Responsável geral: A ser definido conforme processo`,
-            `Equipe: Membros definidos na fase de Planejamento`,
-            'Estrutura organizacional: A ser preenchida conforme organograma da instituição'
-        ];
-
-        responsabilidades.forEach(resp => {
-            doc.text(`• ${resp}`);
-        });
-    }
-
-    /**
-     * Adicionar seção de fluxo
-     */
-    static adicionarSecaoFluxo(doc, dadosAtividades) {
-        doc.fontSize(11).font('Helvetica').fillColor(this.COLORS.text);
-        
-        const etapas = [
-            { nome: 'Planejamento', desc: dadosAtividades['PLAN_A']?.description || 'Definição dos objetivos' },
-            { nome: 'Análise', desc: 'Compreensão do processo atual (AS-IS)' },
-            { nome: 'Desenho', desc: 'Modelagem do processo otimizado (TO-BE)' },
-            { nome: 'Implementação', desc: 'Execução das mudanças no processo' },
-            { nome: 'Monitoramento', desc: 'Acompanhamento e melhorias contínuas' }
-        ];
-
-        let yPosition = doc.y;
-        etapas.forEach((etapa, idx) => {
-            doc.font('Helvetica-Bold').text(`${idx + 1}. ${etapa.nome}:`, { continued: false });
-            doc.font('Helvetica').text(`   ${etapa.desc}`);
-        });
-    }
-
-    /**
-     * Adicionar seção de indicadores
-     */
-    static adicionarSecaoIndicadores(doc, dadosAtividades) {
-        doc.fontSize(11).font('Helvetica').fillColor(this.COLORS.text);
-        
-        const indicadores = dadosAtividades['DES_E']?.indicators || [];
-        
-        if (Array.isArray(indicadores) && indicadores.length > 0) {
-            indicadores.forEach((ind, idx) => {
-                doc.text(`${idx + 1}. ${ind.nome || 'Indicador'}`);
-                doc.fontSize(10).text(`   Meta: ${ind.meta || 'N/A'}`);
-                doc.text(`   Frequência: ${ind.frequencia || 'N/A'}`);
+    static cell(doc, x, y, width, height, text = '', options = {}) {
+        doc.save().fillColor(options.header ? this.COLORS.headerBg : this.COLORS.bg).rect(x, y, width, height).fill();
+        doc.restore().lineWidth(1.25).strokeColor(this.COLORS.border).rect(x, y, width, height).stroke();
+        doc.fillColor(this.COLORS.text).font(options.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(options.fontSize || 10)
+            .text(this.value(text), x + (options.padding || 6), y + (options.padding || 6), {
+                width: width - ((options.padding || 6) * 2),
+                height: height - ((options.padding || 6) * 2),
+                align: options.align || 'left',
+                lineGap: 1
             });
-        } else {
-            doc.text('Indicadores não definidos nesta fase.');
-        }
     }
 
-    /**
-     * Adicionar seção de documentos de referência
-     */
-    static adicionarSecaoDocumentos(doc, dadosAtividades) {
-        doc.fontSize(11).font('Helvetica').fillColor(this.COLORS.text);
-        
-        const documentos = [
-            'Anexo I - Diagrama de Escopo e Interface',
-            'Anexo II - Plano do Projeto',
-            'Anexo IV - Análise de Riscos',
-            'Anexo VI - Documentação Descritiva',
-            'Anexo VII - Plano de Implementação',
-            'Anexo VIII - Plano de Capacitação'
-        ];
+    static renderHeader(doc, y) {
+        const x = 50;
+        const left = 119;
+        const center = 267;
+        const right = 109;
+        const height = 132;
+        this.cell(doc, x, y, left, height, '', { padding: 8 });
+        doc.fillColor(this.COLORS.text).font('Helvetica-Bold').fontSize(38).text('POP', x + 8, y + 35, { width: left - 16, align: 'center' });
+        doc.fontSize(9).text('Procedimento Operacional\nPadrão - POP', x + 8, y + 91, { width: left - 16, align: 'center' });
+        this.cell(doc, x + left, y, center, height, 'Governo do Rio Grande do Norte\nSecretaria de Segurança Pública e da Defesa Social\nPolícia Científica do RN\nDireção Geral', { bold: true, align: 'center', fontSize: 11, padding: 10 });
+        this.cell(doc, x + left + center, y, right, height, '', { padding: 4 });
+        const logoPath = path.join(__dirname, '../../public/assets/images/logo-sge-pci-removebg-preview.png');
+        if (fs.existsSync(logoPath)) doc.image(logoPath, x + left + center + 24, y + 22, { fit: [right - 48, height - 44], align: 'center', valign: 'center' });
+        return y + height;
+    }
 
-        documentos.forEach(doc_item => {
-            doc.text(`• ${doc_item}`);
+    static renderPageOne(doc, data) {
+        doc.addPage({ size: 'A4', margin: 0 });
+        this.configure(doc);
+        const x = 50;
+        const width = 495;
+        let y = 45;
+        y = this.renderHeader(doc, y);
+        const labelWidth = 128;
+        const valueWidth = 119.5;
+        const rowHeight = 27;
+        const pairs = [
+            ['1. Título:', data.titulo, '2. Área:', data.area],
+            ['3. Setor:', data.setor, '4. Páginas:', data.paginas],
+            ['5. Versão:', data.versao, '6. Última Revisão:', data.ultimaRevisao]
+        ];
+        pairs.forEach(row => {
+            this.cell(doc, x, y, labelWidth, rowHeight, row[0], { header: true, bold: true, fontSize: 10 });
+            this.cell(doc, x + labelWidth, y, valueWidth, rowHeight, row[1], { fontSize: 9 });
+            this.cell(doc, x + labelWidth + valueWidth, y, labelWidth, rowHeight, row[2], { header: true, bold: true, fontSize: 10 });
+            this.cell(doc, x + (labelWidth * 2) + valueWidth, y, valueWidth, rowHeight, row[3], { fontSize: 9 });
+            y += rowHeight;
+        });
+        const sections = [
+            ['7. Finalidade:', data.finalidade, 42],
+            ['8. Público Alvo:', data.publicoAlvo, 42],
+            ['9. Material Recomendado:', data.materialRecomendado, 118],
+            ['10. Procedimentos Operacionais:', data.procedimentosOperacionais, 78],
+            ['11. Orientações:', data.orientacoes, 30],
+            ['12. Definições/Abreviaturas:', data.definicoesAbreviaturas, 30]
+        ];
+        sections.forEach(([label, value, height]) => {
+            this.cell(doc, x, y, width, 27, label, { header: true, bold: true, fontSize: 10 });
+            this.cell(doc, x, y + 27, width, height, value, { fontSize: 9, padding: 7 });
+            y += 27 + height;
         });
     }
 
-    /**
-     * Adicionar seção de histórico
-     */
-    static adicionarSecaoHistorico(doc, dadosProcesso) {
-        doc.fontSize(11).font('Helvetica').fillColor(this.COLORS.text);
-        
-        const dataGeracao = new Date().toLocaleDateString('pt-BR');
-        
-        doc.text(`Versão 1.0 - ${dataGeracao}`);
-        doc.text('Criação do Procedimento Operacional Padrão no SGE PCI/RN');
-    }
-
-    /**
-     * Adicionar rodapé
-     */
-    static adicionarRodape(doc) {
-        const pageCount = doc.bufferedPageRange().count;
-        
-        for (let i = 0; i < pageCount; i++) {
-            doc.switchToPage(i);
-            
-            // Linha separadora
-            doc.moveTo(50, doc.page.height - 50)
-                .lineTo(545, doc.page.height - 50)
-                .stroke(this.COLORS.border);
-            
-            // Informações de rodapé
-            doc.fontSize(9).fillColor(this.COLORS.lightText)
-                .text('Procedimento Operacional Padrão - SGE PCI/RN', 50, doc.page.height - 40, { align: 'left' })
-                .text(`Página ${i + 1} de ${pageCount}`, 480, doc.page.height - 40, { align: 'right' });
-        }
+    static renderPageTwo(doc, data) {
+        doc.addPage({ size: 'A4', margin: 0 });
+        this.configure(doc);
+        const x = 50;
+        const width = 495;
+        let y = 45;
+        const sections = [
+            ['13. Fluxograma:', data.fluxograma, 150],
+            ['14. Anexos:', data.anexos, 235],
+            ['15. Elaboradores:', data.elaboradores, 34],
+            ['16. Revisor:', data.revisor, 34],
+            ['17. Homologador:', data.homologador, 34]
+        ];
+        sections.forEach(([label, value, height]) => {
+            this.cell(doc, x, y, width, 27, label, { header: true, bold: true, fontSize: 10 });
+            this.cell(doc, x, y + 27, width, height, value, { fontSize: 9, padding: 7 });
+            y += 27 + height;
+        });
     }
 }
 

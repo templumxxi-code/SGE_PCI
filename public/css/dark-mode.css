@@ -93,6 +93,23 @@ html[data-theme="dark"] label {
     color: var(--color-text);
 }
 
+html[data-theme="dark"] .login-form label {
+    color: var(--color-text);
+}
+
+html[data-theme="dark"] .login-form input,
+html[data-theme="dark"] .login-form select {
+    background-color: var(--color-bg-secondary);
+    color: var(--color-text);
+    border-color: var(--color-border);
+}
+
+html[data-theme="dark"] .login-form input::placeholder,
+html[data-theme="dark"] .login-form select::placeholder {
+    color: rgba(242, 245, 248, 0.68);
+    opacity: 1;
+}
+
 html[data-theme="dark"] .data-table td .text-muted,
 html[data-theme="dark"] .data-table td small {
     color: var(--color-text-secondary) !important;

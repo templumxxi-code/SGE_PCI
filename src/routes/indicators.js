@@ -7,13 +7,15 @@ const router = express.Router();
 const indicatorController = require('../controllers/indicatorController');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 
+const legacyUserId = (req) => req.user.legacyUserId ?? req.user.id;
+
 /**
  * POST /api/indicators
  * Criar indicador
  */
 router.post('/', verifyToken, async (req, res, next) => {
     try {
-        const indicador = await indicatorController.criarIndicador(req.body, req.user.id, req.user.perfil);
+        const indicador = await indicatorController.criarIndicador(req.body, legacyUserId(req), req.user.perfil);
         res.status(201).json(indicador);
     } catch (error) {
         next(error);
@@ -26,7 +28,7 @@ router.post('/', verifyToken, async (req, res, next) => {
  */
 router.get('/:id', verifyToken, async (req, res, next) => {
     try {
-        const indicador = await indicatorController.obterIndicador(req.params.id, req.user.id, req.user.perfil);
+        const indicador = await indicatorController.obterIndicador(req.params.id, legacyUserId(req), req.user.perfil);
 
         if (!indicador) {
             return res.status(404).json({ error: 'Indicador não encontrado' });
@@ -53,7 +55,7 @@ router.put('/:id/valor', verifyToken, async (req, res, next) => {
         const indicadorAtualizado = await indicatorController.atualizarValorIndicador(
             req.params.id,
             novoValor,
-            req.user.id,
+            legacyUserId(req),
             req.user.perfil
         );
 
@@ -69,7 +71,7 @@ router.put('/:id/valor', verifyToken, async (req, res, next) => {
  */
 router.get('/setor/:setorId', verifyToken, async (req, res, next) => {
     try {
-        const indicadores = await indicatorController.obterIndicadoresSetor(req.params.setorId, req.user.id, req.user.perfil);
+        const indicadores = await indicatorController.obterIndicadoresSetor(req.params.setorId, legacyUserId(req), req.user.perfil);
         res.json(indicadores);
     } catch (error) {
         next(error);

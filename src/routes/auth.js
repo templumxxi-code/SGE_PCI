@@ -7,6 +7,8 @@ const router = express.Router();
 const authController = require('../controllers/authController');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 const { loginLimiter } = require('../middleware/loginLimiter');
+const { revokeSession } = require('../repositories/sessionRepository');
+const { recordAuthAudit } = require('../controllers/authController');
 
 /**
  * POST /api/auth/login
@@ -20,7 +22,7 @@ router.post('/login', loginLimiter, async (req, res, next) => {
             return res.status(400).json({ error: 'Credenciais inválidas.' });
         }
 
-        const resultado = await authController.login(email, senha, perfil);
+        const resultado = await authController.login(email, senha, perfil, req);
         res.json(resultado);
     } catch (error) {
         next(error);
@@ -195,6 +197,21 @@ router.put('/usuarios/:id/status', verifyToken, requireAdmin, async (req, res, n
  */
 router.get('/perfil', verifyToken, async (req, res) => {
     res.json(req.user);
+});
+
+/**
+ * POST /api/auth/logout
+ * Revogar tokens emitidos antes deste instante para o usuario.
+ */
+router.post('/logout', verifyToken, async (req, res, next) => {
+    try {
+        const token = req.headers.authorization.slice(7);
+        await revokeSession(req.user.id, token);
+        await recordAuthAudit(req.user.id, 'USER_LOGOUT', req);
+        res.status(204).end();
+    } catch (error) {
+        next(error);
+    }
 });
 
 module.exports = router;

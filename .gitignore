@@ -1,5 +1,7 @@
 node_modules/
 .env
+.env.*
+!.env.example
 .tmp-postgres/
 postgres-data/
 *.pid
@@ -24,5 +26,18 @@ storage/tmp/
 database.db
 *.sqlite
 .env.production
+scripts/backup.env
+storage/backups/
+storage/logs/
+storage/users.json
+database/seed.sql
+validation/
+archive_cleanup_*/
+public/tmp/
+*.bak
+*.tmp
+*.pdf
+backup*.sql
+*_backup.sql
 .cache/
 temp/

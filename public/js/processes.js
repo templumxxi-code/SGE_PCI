@@ -15,13 +15,18 @@ class ProcessManager {
         mobileDetailVisible: false
     };
     static selectedIndicatorsProcessId = null;
-    static availableSetores = [
-        { id: 1, nome: 'Genética' },
-        { id: 2, nome: 'Química' },
-        { id: 3, nome: 'Documentoscopia' },
-        { id: 4, nome: 'Balística' },
-        { id: 5, nome: 'Fotografia' }
-    ];
+    static availableSetores = [];
+
+    static getAvailableSetoresForSelection() {
+        const org = window.AccessControl?.getStoredOrganizationData?.() || { institutes: [], regionais: [], subcoordenações: [], assessorias: [], nuclei: [], sectors: [] };
+        const sectors = Array.isArray(org.sectors) ? org.sectors : [];
+        return sectors.map((sector) => ({ id: sector.id, nome: sector.nome || sector.name || 'Setor sem nome' }));
+    }
+
+    static getSetorDisplayName(setorId) {
+        const sector = this.getAvailableSetoresForSelection().find((item) => String(item.id) === String(setorId));
+        return sector?.nome || 'Não definido';
+    }
 
     static availableMacroprocessos = [
         { id: 1, nome: 'Investigação' },
@@ -114,21 +119,21 @@ class ProcessManager {
 
     static PLANEJAR_REQUIREMENT_CATALOG = {
         PLAN_A: [
-            { id: 'objective', label: 'Objetivo do Projeto de Melhoria' },
-            { id: 'strengths', label: 'Forças' },
-            { id: 'weaknesses', label: 'Fraquezas' },
-            { id: 'opportunities', label: 'Oportunidades' },
-            { id: 'threats', label: 'Ameaças' },
-            { id: 'cronograma', label: 'Anexo III — Cronograma' },
-            { id: 'checklist', label: 'Checklist da atividade' }
-        ],
-        PLAN_B: [
             { id: 'participant-name', label: 'Nome' },
             { id: 'participant-registration', label: 'Matrícula' },
             { id: 'participant-responsibilities', label: 'Responsabilidades' },
             { id: 'participant-sector', label: 'Setor' },
             { id: 'participant-assignments', label: 'Seleção de fase ou atividade' },
             { id: 'participant-active', label: 'Participante ativo' },
+            { id: 'checklist', label: 'Checklist da atividade' }
+        ],
+        PLAN_B: [
+            { id: 'objective', label: 'Objetivo do Projeto de Melhoria' },
+            { id: 'strengths', label: 'Forças' },
+            { id: 'weaknesses', label: 'Fraquezas' },
+            { id: 'opportunities', label: 'Oportunidades' },
+            { id: 'threats', label: 'Ameaças' },
+            { id: 'cronograma', label: 'Anexo III — Cronograma' },
             { id: 'checklist', label: 'Checklist da atividade' }
         ],
         PLAN_C: [
@@ -239,16 +244,34 @@ class ProcessManager {
     static LOCALSTORAGE_VERSION_KEY = 'sge_pci_frontend_version';
     static LOCALSTORAGE_PROCESSES_KEY = 'sge_pci_processos';
     static LOCALSTORAGE_ACTIVITY_SELECTION_KEY = 'sge_pci_selected_activity';
+    static PLANEJAR_AB_SWAP_KEY = 'sge_pci_planejar_ab_content_swap_v1';
     static SEARCH_INPUT_ID = 'process-search';
     static FILTER_SELECT_ID = 'process-phase-filter';
+    static BPM_DATA_SOURCE = String(window.BPM_DATA_SOURCE || 'API').toUpperCase();
+    static apiProcesses = null;
 
     static async loadProcesses() {
         this.ensureLocalStorageVersion();
         this.registerProcessTabEvents();
         this.initializeCreateProcessForm();
 
-        const processes = this.getStoredProcesses().map((processo) => this.normalizeProcessBpmStructure(processo));
-        this.setStoredProcesses(processes);
+        let processes;
+        if (this.BPM_DATA_SOURCE === 'API' && window.bpmApi) {
+            try {
+                const apiProcesses = await window.bpmApi.getProcesses();
+                const hydratedProcesses = await Promise.all(apiProcesses.map(async (processo) => {
+                    try { return await window.bpmApi.getProcessById(processo.id); }
+                    catch (_) { return processo; }
+                }));
+                processes = hydratedProcesses.map((processo) => this.normalizeApiProcess(processo));
+                this.apiProcesses = processes;
+            } catch (error) {
+                console.error('Falha ao carregar processos pela API:', error);
+                processes = this.getStoredProcesses().map((processo) => this.normalizeProcessBpmStructure(processo));
+            }
+        } else {
+            processes = this.getStoredProcesses().map((processo) => this.normalizeProcessBpmStructure(processo));
+        }
         // If there's a stored selection, hydrate myProcessesState
         const sel = this.getStoredSelection();
         if (sel) {
@@ -263,6 +286,38 @@ class ProcessManager {
         this.renderSelectedActivityFromStorage();
     }
 
+    static normalizeApiProcess(processo) {
+        return {
+            ...processo,
+            id: processo.id,
+            nome: processo.name || processo.nome,
+            observacoes: processo.description || processo.observacoes || '',
+            status_fase: processo.current_phase || processo.status_fase || 'PLAN',
+            percentual_conclusao: Number(processo.progress_percent || processo.percentual_conclusao || 0),
+            responsavel_id: processo.responsible_user_id || processo.responsavel_id || null,
+            setor_id: processo.organizational_unit_id || processo.setor_id || null,
+            createdByUserId: processo.created_by || processo.createdByUserId || null,
+            phases: (Array.isArray(processo.phases) ? processo.phases : []).map((phase) => ({
+                ...phase,
+                name: phase.phase_name || phase.name,
+                percentual: Number(phase.progress_percent || phase.progress || 0),
+                activities: (Array.isArray(phase.activities) ? phase.activities : []).map((activity) => ({
+                    ...activity,
+                    code: activity.activity_code || activity.codigo || activity.code,
+                    title: activity.title || activity.titulo,
+                    descricao: activity.description || activity.descricao || '',
+                    checklist: (Array.isArray(activity.checklist) ? activity.checklist : []).map((item) => ({
+                        ...item,
+                        itemId: item.id || item.itemId,
+                        texto: item.description || item.descricao || item.texto,
+                        concluido: Boolean(item.completed ?? item.concluido),
+                        concluidoEm: item.completed_at || item.concluidoEm
+                    }))
+                }))
+            }))
+        };
+    }
+
     static ensureLocalStorageVersion() {
         const storedVersion = localStorage.getItem(this.LOCALSTORAGE_VERSION_KEY);
         if (storedVersion !== this.LOCALSTORAGE_DATA_VERSION) {
@@ -273,6 +328,49 @@ class ProcessManager {
         if (!localStorage.getItem(this.LOCALSTORAGE_PROCESSES_KEY)) {
             localStorage.setItem(this.LOCALSTORAGE_PROCESSES_KEY, JSON.stringify([]));
         }
+
+        this.migratePlanejarABContentSwap();
+    }
+
+    static migratePlanejarABContentSwap() {
+        if (localStorage.getItem(this.PLANEJAR_AB_SWAP_KEY) === 'true') return;
+
+        const processes = this.getStoredProcesses();
+        processes.forEach(processo => {
+            const phase = processo.phases?.find(item => item.name === 'Planejar');
+            const activityA = phase?.activities?.find(item => item.code === 'PLAN_A');
+            const activityB = phase?.activities?.find(item => item.code === 'PLAN_B');
+            if (!activityA || !activityB) return;
+
+            const payloadA = JSON.parse(JSON.stringify(activityA));
+            const payloadB = JSON.parse(JSON.stringify(activityB));
+            const copyPayload = (target, source) => {
+                Object.keys(target).forEach(key => {
+                    if (key !== 'code' && key !== 'title') delete target[key];
+                });
+                Object.entries(source).forEach(([key, value]) => {
+                    if (key !== 'code' && key !== 'title') target[key] = value;
+                });
+            };
+
+            copyPayload(activityA, payloadB);
+            copyPayload(activityB, payloadA);
+        });
+
+        processes.forEach(processo => {
+            (processo.teamMembers || []).forEach(member => {
+                if (Array.isArray(member.assignedActivities)) {
+                    member.assignedActivities = member.assignedActivities.map(code => {
+                        if (code === 'PLAN_A') return 'PLAN_B';
+                        if (code === 'PLAN_B') return 'PLAN_A';
+                        return code;
+                    });
+                }
+            });
+        });
+
+        this.setStoredProcesses(processes);
+        localStorage.setItem(this.PLANEJAR_AB_SWAP_KEY, 'true');
     }
 
     static clearLegacyProcessStorage() {
@@ -294,6 +392,9 @@ class ProcessManager {
     }
 
     static getStoredProcesses() {
+        if (this.BPM_DATA_SOURCE === 'API' && Array.isArray(this.apiProcesses)) {
+            return this.apiProcesses;
+        }
         try {
             return JSON.parse(localStorage.getItem(this.LOCALSTORAGE_PROCESSES_KEY)) || [];
         } catch (error) {
@@ -302,6 +403,10 @@ class ProcessManager {
     }
 
     static setStoredProcesses(processes) {
+        if (this.BPM_DATA_SOURCE === 'API') {
+            this.apiProcesses = processes;
+            return;
+        }
         localStorage.setItem(this.LOCALSTORAGE_PROCESSES_KEY, JSON.stringify(processes));
     }
 
@@ -1312,6 +1417,9 @@ class ProcessManager {
                                 </div>
                             </div>
                             <div class="process-summary-status">
+                                    <button type="button" class="btn-icon process-delete-button" data-action="delete-process" data-process-id="${processo.id}" aria-label="Excluir processo ${processo.nome}" title="Excluir processo">
+                                        <i class="fas fa-trash" aria-hidden="true"></i>
+                                    </button>
                                     <span class="badge badge-${this.getStatusBadgeClass(processo.status_fase)}">${processo.status_fase}</span>
                                     <span class="process-arrow process-summary-icon" aria-hidden="true">${processo.isExpanded ? '<i class="fas fa-chevron-down"></i>' : '<i class="fas fa-chevron-right"></i>'}</span>
                                 </div>
@@ -1384,6 +1492,9 @@ class ProcessManager {
             const activityCode = target.dataset.activityCode || target.dataset.activity || target.dataset.activityCode;
 
             switch (action) {
+                case 'delete-process':
+                    if (processId) this.confirmDeleteProcess(processId);
+                    break;
                 case 'toggle-process':
                     if (processId) this.toggleProcess(processId);
                     break;
@@ -1578,7 +1689,7 @@ class ProcessManager {
 
         if (phaseName === 'Planejar') {
             const legendHtml = this.isPlanejarRequirementRequired(activityCode, 'objective') || this.isPlanejarRequirementRequired(activityCode, 'anexoII') || this.isPlanejarRequirementRequired(activityCode, 'cronograma') || this.isPlanejarRequirementRequired(activityCode, 'documentacao') || this.isPlanejarRequirementRequired(activityCode, 'deip') || this.isPlanejarRequirementRequired(activityCode, 'participant-name') || this.isPlanejarRequirementRequired(activityCode, 'ata') ? '<div class="required-fields-legend">* Campo obrigatório para prosseguimento.</div>' : '';
-            if (activityCode === 'PLAN_A') {
+            if (activityCode === 'PLAN_B') {
                 html = `
                     <div class="activity-panel-content">
                         ${legendHtml}
@@ -1607,9 +1718,9 @@ class ProcessManager {
                         </div>
                     </div>
                 `;
-            } else if (activityCode === 'PLAN_B') {
+            } else if (activityCode === 'PLAN_A') {
                 const members = processo.teamMembers || [];
-                const sectorsOptions = this.availableSetores.map(s => `<option value="${s.id}">${s.nome}</option>`).join('');
+                const sectorsOptions = this.getAvailableSetoresForSelection().map(s => `<option value="${s.id}">${s.nome}</option>`).join('');
                 html = `
                     <div class="activity-panel-content">
                         <div class="team-list">
@@ -2249,7 +2360,17 @@ class ProcessManager {
         `;
     }
 
-    static toggleChecklistItemLocal(processoId, phaseName, activityCode, itemId, checked) {
+    static async toggleChecklistItemLocal(processoId, phaseName, activityCode, itemId, checked) {
+        if (this.BPM_DATA_SOURCE === 'API' && window.bpmApi && /^[0-9a-f-]{36}$/i.test(String(itemId))) {
+            try {
+                await window.bpmApi.completeChecklistItem(itemId, checked);
+                await this.loadProcesses();
+            } catch (error) {
+                console.error('Falha ao atualizar checklist pela API:', error);
+                notificar(error.message || 'Não foi possível atualizar o checklist.', 'danger');
+            }
+            return;
+        }
         const processes = this.getStoredProcesses();
         const processo = processes.find(p => p.id === processoId);
         if (!processo) return;
@@ -2735,7 +2856,7 @@ class ProcessManager {
         const missing = [];
 
         switch (activityCode) {
-            case 'PLAN_A':
+            case 'PLAN_B':
                 if (!String(content.objective || '').trim()) missing.push('Objetivo do Projeto de Melhoria');
                 if (!String(content.strengths || '').trim()) missing.push('Forças');
                 if (!String(content.weaknesses || '').trim()) missing.push('Fraquezas');
@@ -2744,7 +2865,7 @@ class ProcessManager {
                 if (!this.hasValidRequiredAttachment(processo, phaseName, activityCode, 'Anexo III — Cronograma')) missing.push('Anexo III — Cronograma');
                 if (!checklist.some(i => i.concluido)) missing.push('Checklist da atividade');
                 break;
-            case 'PLAN_B':
+            case 'PLAN_A':
                 if (!this.getActivityResponsibles(processo, phaseName, activityCode).length) missing.push('Participante ativo');
                 if (!checklist.some(i => i.concluido)) missing.push('Checklist da atividade');
                 break;
@@ -2975,6 +3096,44 @@ class ProcessManager {
         return (this.PLANEJAR_REQUIREMENT_CATALOG[activityCode] || []).length;
     }
 
+    static getChecklistStatusValue(item) {
+        const status = String(item?.status ?? '').trim().toLowerCase();
+        const normalized = status.replace(/[^a-z]/g, '');
+        return item?.concluido === true || normalized === 'concluido' || normalized === 'concluida' || normalized === 'concluido' || normalized === 'completed' || normalized === 'finalizado';
+    }
+
+    static getActivityChecklistMetrics(activity) {
+        const checklist = Array.isArray(activity?.checklist) ? activity.checklist : [];
+        const total = checklist.length;
+        const completed = checklist.filter((item) => this.getChecklistStatusValue(item)).length;
+        return {
+            total,
+            completed,
+            pending: Math.max(0, total - completed),
+            percent: total ? Math.round((completed / total) * 100) : 0
+        };
+    }
+
+    static getProcessChecklistMetrics(processo, phaseName = null) {
+        if (!processo || !Array.isArray(processo.phases)) {
+            return { total: 0, completed: 0, pending: 0, percent: 0 };
+        }
+
+        const phases = phaseName ? processo.phases.filter((phase) => phase?.name === phaseName) : processo.phases;
+        const result = phases.reduce((acc, phase) => {
+            (phase?.activities || []).forEach((activity) => {
+                const stats = this.getActivityChecklistMetrics(activity);
+                acc.total += stats.total;
+                acc.completed += stats.completed;
+                acc.pending += stats.pending;
+            });
+            return acc;
+        }, { total: 0, completed: 0, pending: 0 });
+
+        result.percent = result.total ? Math.round((result.completed / result.total) * 100) : 0;
+        return result;
+    }
+
     static calculateActivityProgress(processoId, phaseName, activityCode) {
         const processes = this.getStoredProcesses();
         const processo = processes.find(p => p.id === processoId);
@@ -3002,12 +3161,8 @@ class ProcessManager {
             return Math.round((completed / requiredCount) * 100);
         }
 
-        // Para todas as outras fases: progresso = checklists concluídos / total de checklists
-        const checklist = activity.checklist || [];
-        if (!checklist.length) return 0;
-        const done = checklist.filter(i => i.concluido).length;
-        const percent = Math.round((done / checklist.length) * 100);
-        return percent;
+        const metrics = this.getActivityChecklistMetrics(activity);
+        return metrics.total ? metrics.percent : 0;
     }
 
     static calculatePhaseProgress(processoId, phaseName) {
@@ -3016,9 +3171,7 @@ class ProcessManager {
         if (!processo) return 0;
         const phase = processo.phases.find(f => f.name === phaseName);
         if (!phase || !phase.activities || phase.activities.length === 0) return 0;
-        const values = phase.activities.map(a => this.calculateActivityProgress(processoId, phaseName, a.code));
-        const avg = values.length ? Math.round(values.reduce((s, v) => s + v, 0) / values.length) : 0;
-        return avg;
+        return this.getProcessChecklistMetrics(processo, phaseName).percent;
     }
 
     static calculateProcessProgress(processoId) {
@@ -3027,9 +3180,7 @@ class ProcessManager {
         if (!processo) return 0;
         const phasesWithActivities = processo.phases.filter(p => p.activities && p.activities.length > 0);
         if (!phasesWithActivities.length) return 0;
-        const values = phasesWithActivities.map(p => this.calculatePhaseProgress(processoId, p.name));
-        const avg = values.length ? Math.round(values.reduce((s, v) => s + v, 0) / values.length) : 0;
-        return avg;
+        return this.getProcessChecklistMetrics(processo).percent;
     }
 
     static recalculateAndRender(processoId) {
@@ -3091,6 +3242,7 @@ class ProcessManager {
     }
 
     static getMacroprocessoName(macroprocessoId) {
+        if (typeof macroprocessoId === 'string' && macroprocessoId.trim()) return macroprocessoId.trim();
         return this.availableMacroprocessos.find((item) => item.id === macroprocessoId)?.nome || 'Não definido';
     }
 
@@ -3119,8 +3271,8 @@ class ProcessManager {
                 const processo = {
                     id: processoId,
                     nome: processoNome,
-                    setor_id: 1,
-                    setor_nome: 'Genética',
+                    setor_id: null,
+                    setor_nome: 'Não definido',
                     macroprocesso_id: 1,
                     macroprocesso_nome: 'Investigação',
                     status_fase: 'Desenhar',
@@ -3269,6 +3421,7 @@ class ProcessManager {
 
     static createProcessTemplate(data) {
         const processId = this.getNextProcessId();
+        const currentUser = window.AccessControl?.normalizeUser?.(window.app?.currentUser) || window.app?.currentUser || {};
         const phases = this.getBpmPhaseTemplates().map((phase) => ({
             ...phase,
             activities: phase.activities.map((activity) => ({ ...activity }))
@@ -3276,13 +3429,15 @@ class ProcessManager {
 
         return {
             id: processId,
+            createdByUserId: currentUser.id || null,
+            createdByUserName: currentUser.nome || currentUser.name || '',
             nome: data.nome,
             setor_id: data.setor_id,
-            setor_nome: this.availableSetores.find((s) => s.id === data.setor_id)?.nome || 'Não definido',
+            setor_nome: this.getSetorDisplayName(data.setor_id),
             responsavel_id: data.responsavel_id,
             responsavel_nome: data.responsavel_id ? this.getResponsavelName(data.responsavel_id) : 'Não definido',
-            macroprocesso_id: data.macroprocesso_id,
-            macroprocesso_nome: this.getMacroprocessoName(data.macroprocesso_id),
+            macroprocesso_id: data.macroprocesso_id || null,
+            macroprocesso_nome: data.macroprocesso_nome || this.getMacroprocessoName(data.macroprocesso_id),
             status_fase: 'Planejar',
             percentual_conclusao: 0,
             prazo: 'Não definido',
@@ -3375,6 +3530,16 @@ class ProcessManager {
     }
 
     static async createProcess(data) {
+        if (this.BPM_DATA_SOURCE === 'API' && window.bpmApi) {
+            const created = await window.bpmApi.createProcess({
+                name: data.nome,
+                description: data.observacoes || '',
+                organizational_unit_id: data.organizational_unit_id || data.setor_id,
+                responsible_user_id: data.responsavel_id || null
+            });
+            await this.loadProcesses();
+            return created;
+        }
         const processes = this.getStoredProcesses();
         const newProcess = this.createProcessTemplate(data);
         processes.unshift(newProcess);
@@ -3392,9 +3557,9 @@ class ProcessManager {
 
         processo.nome = data.nome;
         processo.setor_id = data.setor_id;
-        processo.setor_nome = this.availableSetores.find((s) => s.id === data.setor_id)?.nome || processo.setor_nome;
-        processo.macroprocesso_id = data.macroprocesso_id;
-        processo.macroprocesso_nome = this.getMacroprocessoName(data.macroprocesso_id);
+        processo.setor_nome = this.getSetorDisplayName(data.setor_id) || processo.setor_nome;
+        processo.macroprocesso_id = data.macroprocesso_id || null;
+        processo.macroprocesso_nome = data.macroprocesso_nome || this.getMacroprocessoName(data.macroprocesso_id);
         processo.responsavel_id = data.responsavel_id;
         processo.responsavel_nome = data.responsavel_id ? this.getResponsavelName(data.responsavel_id) : processo.responsavel_nome;
         processo.observacoes = data.observacoes || processo.observacoes;
@@ -3404,10 +3569,29 @@ class ProcessManager {
     }
 
     static async deleteProcess(processoId) {
-        const processes = this.getStoredProcesses().filter((p) => p.id !== processoId);
+        const processes = this.getStoredProcesses().filter((p) => String(p.id) !== String(processoId));
         this.setStoredProcesses(processes);
         this.clearStoredSelection();
         this.renderProcesses(processes);
+    }
+
+    static canDeleteProcess(processo) {
+        const user = window.AccessControl?.normalizeUser?.(window.app?.currentUser) || window.app?.currentUser || {};
+        const profile = String(user.perfil || user.accessProfileKey || '').toUpperCase();
+        return profile === 'NGE' || profile === 'NGE_ADMIN' || String(processo?.createdByUserId || '') === String(user.id || '');
+    }
+
+    static async confirmDeleteProcess(processoId) {
+        const processo = this.getStoredProcesses().find((item) => String(item.id) === String(processoId));
+        if (!processo || !this.canDeleteProcess(processo)) {
+            notificar('Você só pode remover processos inseridos por você.', 'warning');
+            return;
+        }
+
+        const confirmed = window.confirm(`Deseja remover o processo "${processo.nome}"? Esta ação não pode ser desfeita.`);
+        if (!confirmed) return;
+        await this.deleteProcess(processoId);
+        notificar('Processo removido com sucesso.', 'success');
     }
 
     static async saveActivity(processoId, phaseName, activityCode) {
@@ -3424,7 +3608,7 @@ class ProcessManager {
         activity.status = activity.concluida ? 'concluida' : 'em_andamento';
         activity.updatedAt = new Date().toISOString();
 
-        if (phaseName === 'Planejar' && activityCode === 'PLAN_A') {
+        if (phaseName === 'Planejar' && activityCode === 'PLAN_B') {
             const objective = document.getElementById('detail-objective')?.value.trim() || '';
             activity.content = {
                 objective,
@@ -3433,7 +3617,7 @@ class ProcessManager {
                 opportunities: document.getElementById('detail-swot-opportunities')?.value.trim() || '',
                 threats: document.getElementById('detail-swot-threats')?.value.trim() || ''
             };
-        } else if (phaseName === 'Planejar' && activityCode === 'PLAN_B') {
+        } else if (phaseName === 'Planejar' && activityCode === 'PLAN_A') {
             activity.content = { savedAt: new Date().toISOString() };
         } else if (phaseName === 'Planejar' && activityCode === 'PLAN_E') {
             const objetivo = document.getElementById(`planE-objetivo-estrategico-${processoId}`)?.value.trim() || '';
@@ -3953,7 +4137,7 @@ class ProcessManager {
             name,
             registration: registration || '',
             sectorId: sector,
-            sectorName: this.availableSetores.find(s => String(s.id) === String(sector))?.nome || '',
+            sectorName: this.getSetorDisplayName(sector),
             assignedPhases: selectedPhases,
             assignedActivities: selectedActivities,
             ativo: true,
@@ -4145,7 +4329,7 @@ class ProcessManager {
         member.name = name;
         member.registration = registration || '';
         member.sectorId = sector;
-        member.sectorName = this.availableSetores.find(s => String(s.id) === String(sector))?.nome || '';
+        member.sectorName = this.getSetorDisplayName(sector);
         member.assignedPhases = selectedPhases;
         member.assignedActivities = selectedActivities;
         member.ativo = true;
@@ -4240,7 +4424,7 @@ class ProcessManager {
 
             const action = button.dataset.action;
             const rawProcessId = button.dataset.processoId || button.dataset.processId || button.dataset.id;
-            const processoId = rawProcessId ? parseInt(rawProcessId, 10) : null;
+            const processoId = rawProcessId || null;
             const code = button.dataset.code;
             const tipo = button.dataset.tipo;
             const phaseCode = button.dataset.phaseCode || button.dataset.phase || button.dataset.phaseName;
@@ -4388,14 +4572,14 @@ class ProcessManager {
 
             const action = input.dataset.action;
             const rawProcessId = input.dataset.processoId || input.dataset.processId || input.dataset.id;
-            const processoId = rawProcessId ? parseInt(rawProcessId, 10) : null;
+            const processoId = rawProcessId || null;
             const itemId = input.dataset.itemId;
             const activityCode = input.dataset.activity || input.dataset.activityCode;
             const phaseName = input.dataset.phaseName;
 
             if (action === 'activity-toggle-item') {
                 const checked = event.target.checked;
-                this.toggleChecklistItemLocal(processoId, phaseName, activityCode, itemId, checked);
+                await this.toggleChecklistItemLocal(processoId, phaseName, activityCode, itemId, checked);
                 const target = event.target.closest('.checklist-item');
                 if (target) {
                     const wrapper = target.closest('.activity-checklist');
@@ -4942,7 +5126,7 @@ class ProcessManager {
 
         let html = '';
 
-        if (code === 'PLAN_A') {
+        if (code === 'PLAN_B') {
             const swot = Array.isArray(planejarData?.swot) ? planejarData.swot : [];
             const swotValues = {
                 strengths: '',
@@ -5008,7 +5192,7 @@ class ProcessManager {
                     <div class="activity-note">O objetivo é obrigatório. Dados vinculados ao processo são mantidos ao atualizar a página.</div>
                 </div>
             `;
-        } else if (code === 'PLAN_B') {
+        } else if (code === 'PLAN_A') {
             html = `
                 <div class="activity-detail">
                     <table class="table table-sm">
@@ -5066,11 +5250,11 @@ class ProcessManager {
         panel.innerHTML = html;
         panel.style.display = 'block';
 
-        if (code === 'PLAN_B') {
+        if (code === 'PLAN_A') {
             await this.renderActivityTeam(processoId);
         }
 
-        if (code === 'PLAN_A') {
+        if (code === 'PLAN_B') {
             await this.renderActivityFileList(processoId, code, 'cronograma');
         }
 
@@ -5104,7 +5288,6 @@ class ProcessManager {
      */
     static initializeCreateProcessForm() {
         this.populateSetorOptions();
-        this.populateMacroprocessoOptions();
         this.populateResponsavelOptions();
     }
 
@@ -5115,16 +5298,18 @@ class ProcessManager {
         const normalizedUser = window.AccessControl?.normalizeUser?.(window.app?.currentUser) || window.app?.currentUser;
         const canSelectUnit = normalizedUser?.perfil !== 'SETOR' && normalizedUser?.perfil !== 'ANALISTA';
 
-        setorSelect.innerHTML = this.availableSetores.map(setor => `
+        const sectors = this.getAvailableSetoresForSelection();
+        setorSelect.innerHTML = sectors.length ? sectors.map(setor => `
             <option value="${setor.id}">${setor.nome}</option>
-        `).join('');
+        `).join('') : '<option value="">Cadastre um setor manualmente</option>';
 
         if (!canSelectUnit) {
-            setorSelect.innerHTML = `
-                <option value="${normalizedUser?.unitId || window.app?.currentUser?.setor_id}">Setor do usuário</option>
-            `;
+            const currentSectorId = normalizedUser?.unitId || window.app?.currentUser?.setor_id || '';
+            setorSelect.innerHTML = currentSectorId ? `
+                <option value="${currentSectorId}">Setor do usuário</option>
+            ` : '<option value="">Cadastre um setor manualmente</option>';
             setorSelect.value = normalizedUser?.unitId || window.app?.currentUser?.setor_id;
-            setorSelect.disabled = true;
+            setorSelect.disabled = !currentSectorId;
         } else {
             setorSelect.disabled = false;
         }
@@ -5133,10 +5318,7 @@ class ProcessManager {
     static populateMacroprocessoOptions() {
         const macroSelect = document.getElementById('macroprocesso-select');
         if (!macroSelect) return;
-
-        macroSelect.innerHTML = this.availableMacroprocessos.map(macro => `
-            <option value="${macro.id}">${macro.nome}</option>
-        `).join('');
+        macroSelect.value = macroSelect.value || '';
     }
 
     static populateResponsavelOptions() {
@@ -5177,7 +5359,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 setor_id: normalizedUser?.perfil === 'SETOR' || normalizedUser?.perfil === 'ANALISTA'
                     ? normalizedUser?.unitId || window.app?.currentUser?.setor_id
                     : parseInt(document.getElementById('setor-select').value),
-                macroprocesso_id: parseInt(document.getElementById('macroprocesso-select').value),
+                macroprocesso_id: null,
+                macroprocesso_nome: document.getElementById('macroprocesso-select').value.trim(),
                 responsavel_id: document.getElementById('responsavel-select').value || null,
                 observacoes: document.getElementById('observacoes-processo').value
             };

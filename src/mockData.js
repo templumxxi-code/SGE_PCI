@@ -2,12 +2,16 @@
 // Mock Data para modo local sem banco de dados
 // ============================================================================
 
+const { getTestCredential } = require('../test/helpers/test-credentials');
+const adminCred = getTestCredential('admin');
+const setorCred = getTestCredential('setor');
+
 const users = [
     {
         id: 1,
         nome: 'Admin NGE',
-        email: 'admin@pci.rn.gov.br',
-        senha: 'admin123',
+        email: adminCred.email,
+        senha: adminCred.senha,
         perfil: 'NGE',
         setor_id: null,
         ativo: true
@@ -15,21 +19,15 @@ const users = [
     {
         id: 2,
         nome: 'Setor Técnico',
-        email: 'setor@pci.rn.gov.br',
-        senha: 'setor123',
+        email: setorCred.email,
+        senha: setorCred.senha,
         perfil: 'SETOR',
         setor_id: 2,
         ativo: true
     }
 ];
 
-const setores = [
-    { id: 1, nome: 'Genética', descricao: 'Setor de genética forense' },
-    { id: 2, nome: 'Química', descricao: 'Setor de análise química' },
-    { id: 3, nome: 'Documentoscopia', descricao: 'Setor de documentos' },
-    { id: 4, nome: 'Balística', descricao: 'Setor de balística' },
-    { id: 5, nome: 'Fotografia', descricao: 'Setor de fotografia forense' }
-];
+const setores = [];
 
 const macroprocessos = [
     { id: 1, nome: 'Gestão de Casos', descricao: 'Gestão de ocorrências e documentos' },

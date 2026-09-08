@@ -9,12 +9,13 @@ const path = require('path');
 const helmet = require('helmet');
 require('dotenv').config();
 
-const jwtSecret = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? null : 'development-secret-change-me');
-if (!jwtSecret && process.env.NODE_ENV === 'production') {
-    throw new Error('JWT_SECRET é obrigatório em produção.');
-}
-if (!process.env.JWT_SECRET && jwtSecret) {
-    process.env.JWT_SECRET = jwtSecret;
+// Validar configuração de ambiente
+const { validateEnvironment } = require('./config/env-validator');
+try {
+    validateEnvironment(process.env.NODE_ENV || 'development');
+} catch (error) {
+    console.error('\n' + error.message + '\n');
+    process.exit(1);
 }
 
 // Importar rotas
@@ -35,7 +36,13 @@ const parseCorsOrigins = () => {
         ? ''
         : 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001';
     const configured = process.env.CORS_ORIGINS || defaultOrigins;
-    return configured.split(',').map((value) => value.trim()).filter(Boolean);
+    const origins = configured.split(',').map((value) => value.trim()).filter(Boolean);
+
+    if (process.env.NODE_ENV === 'production' && origins.includes('*')) {
+        throw new Error('CORS_ORIGINS em produção não pode conter "*"');
+    }
+
+    return origins;
 };
 
 // ============================================================================
@@ -92,6 +99,13 @@ const configureApiRoutes = async () => {
     const reportRoutes = require('./routes/reports');
     const attachmentRoutes = require('./routes/attachments');
     const planejarRoutes = require('./routes/planejar');
+    const userRoutes = require('./routes/users');
+    const organizationRoutes = require('./routes/organization');
+    const checklistRoutes = require('./routes/checklist');
+    const bpmRoutes = require('./routes/bpm');
+    const dashboardRoutes = require('./routes/dashboard');
+    const notificationRoutes = require('./routes/notifications');
+    const strategicReportRoutes = require('./routes/strategicReports');
 
     const useMock = process.env.USE_MOCK_API === 'true';
     app.locals.authMode = useMock ? 'mock' : 'database';
@@ -106,18 +120,34 @@ const configureApiRoutes = async () => {
         app.use('/api/reports', reportRoutes);
         app.use('/api/planejar', planejarRoutes);
         app.use('/api', attachmentRoutes);
+        app.use('/api/users', userRoutes);
+        app.use('/api/organization', organizationRoutes);
+        app.use('/api/checklist', checklistRoutes);
+        app.use('/api/bpm', bpmRoutes);
+        app.use('/api/dashboard', dashboardRoutes);
+        app.use('/api/notifications', notificationRoutes);
+        app.use('/api/reports', strategicReportRoutes);
         console.log('✔️  Rotas reais de autenticação e usuários ativadas com armazenamento local.');
     }
 
     routesConfigured = true;
 };
 
-app.get('/api/health', (req, res) => {
-    res.json({
-        status: 'ok',
-        timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || 'development'
-    });
+app.get('/api/health', async (req, res) => {
+    try {
+        await db.query('SELECT 1');
+        res.json({
+            status: 'ok',
+            database: 'connected',
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        res.status(503).json({
+            status: 'error',
+            database: 'disconnected',
+            timestamp: new Date().toISOString()
+        });
+    }
 });
 
 const initializeApp = async () => {
@@ -140,6 +170,10 @@ const startServer = async (port = PORT) => {
     }
 
     await initializeApp();
+
+    if (process.env.USE_MOCK_API !== 'true') {
+        await db.checkConnection();
+    }
 
     serverInstance = app.listen(port, () => {
         console.log(`

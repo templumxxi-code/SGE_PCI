@@ -36,6 +36,9 @@ function createSandbox() {
       querySelector() { return null; },
       querySelectorAll() { return []; },
       getElementById() { return null; },
+      addEventListener(eventName, handler) {
+        if (eventName === 'DOMContentLoaded') handler();
+      },
       body: { insertAdjacentHTML() {} }
     },
     notificar() {},
@@ -65,8 +68,8 @@ test('dashboard local usa setor do usuário e atualiza métricas após salvar/su
   const dashboardPath = path.join(__dirname, '..', '..', 'public', 'js', 'dashboard.js');
   const processesPath = path.join(__dirname, '..', '..', 'public', 'js', 'processes.js');
 
-  vm.runInNewContext(fs.readFileSync(dashboardPath, 'utf8'), context, { filename: dashboardPath });
-  vm.runInNewContext(fs.readFileSync(processesPath, 'utf8'), context, { filename: processesPath });
+  vm.runInNewContext(`${fs.readFileSync(dashboardPath, 'utf8')}\nthis.DashboardManager = DashboardManager;`, context, { filename: dashboardPath });
+  vm.runInNewContext(`${fs.readFileSync(processesPath, 'utf8')}\nthis.ProcessManager = ProcessManager;`, context, { filename: processesPath });
 
   const initialProcess = {
     id: 1,
@@ -74,6 +77,7 @@ test('dashboard local usa setor do usuário e atualiza métricas após salvar/su
     setor_id: 1,
     status_fase: 'Planejar',
     percentual_conclusao: 0,
+    teamMembers: [{ id: 1, name: 'Participante de teste', assignedActivities: ['PLAN_A'], ativo: true }],
     phases: [{
       name: 'Planejar',
       activities: [{
@@ -93,8 +97,7 @@ test('dashboard local usa setor do usuário e atualiza métricas após salvar/su
   const storedProcesses = [initialProcess];
   context.ProcessManager.getStoredProcesses = () => storedProcesses;
   context.ProcessManager.setStoredProcesses = (items) => {
-    storedProcesses.length = 0;
-    storedProcesses.push(...items);
+    if (items[0]) storedProcesses[0] = items[0];
   };
   context.ProcessManager.recalculateAndRender = () => {};
   context.ProcessManager.getStoredSelection = () => null;
@@ -103,7 +106,8 @@ test('dashboard local usa setor do usuário e atualiza métricas após salvar/su
   const metrics = dashboard.buildDashboardFromLocalProcesses(storedProcesses, context.window.app.currentUser);
   assert.equal(metrics.processos.total, 1);
   assert.equal(metrics.atividades.concluidas, 0);
-  assert.equal(metrics.atividades.pendentes, 2);
+  // Apenas atividades sem conclusão entram como pendentes.
+  assert.equal(metrics.atividades.pendentes, 1);
 
   const saveResult = await context.ProcessManager.saveActivity(1, 'Planejar', 'PLAN_A');
   assert.equal(saveResult, true);
@@ -119,10 +123,115 @@ test('dashboard local usa setor do usuário e atualiza métricas após salvar/su
   assert.equal(storedProcesses[0].phases[0].activities[0].status, 'concluida');
 
   const updatedMetrics = dashboard.buildDashboardFromLocalProcesses(storedProcesses, context.window.app.currentUser);
-  assert.equal(updatedMetrics.atividades.concluidas, 2);
+  assert.equal(updatedMetrics.atividades.concluidas, 1);
   assert.equal(updatedMetrics.atividades.pendentes, 0);
 
   const noSetorMetrics = dashboard.buildDashboardFromLocalProcesses(storedProcesses, { perfil: 'OPERACIONAL' });
   assert.equal(noSetorMetrics.processos.total, 1);
   assert.equal(noSetorMetrics.atividades.pendentes, 0);
+});
+
+test('métrica central considera checklist real de todas as fases e não apenas da fase atual', async () => {
+  const context = createSandbox();
+  const dashboardPath = path.join(__dirname, '..', '..', 'public', 'js', 'dashboard.js');
+  const processesPath = path.join(__dirname, '..', '..', 'public', 'js', 'processes.js');
+
+  vm.runInNewContext(`${fs.readFileSync(dashboardPath, 'utf8')}\nthis.DashboardManager = DashboardManager;`, context, { filename: dashboardPath });
+  vm.runInNewContext(`${fs.readFileSync(processesPath, 'utf8')}\nthis.ProcessManager = ProcessManager;`, context, { filename: processesPath });
+
+  const processo = {
+    id: 9,
+    nome: 'Processo de regressão',
+    setor_id: 1,
+    phases: [
+      {
+        name: 'Planejar',
+        activities: [{
+          code: 'PLAN_A',
+          checklist: [
+            { itemId: 'a1', concluido: true },
+            { itemId: 'a2', concluido: false },
+            { itemId: 'a3', concluido: false }
+          ]
+        }]
+      },
+      {
+        name: 'Analisar',
+        activities: [{
+          code: 'ANAL_A',
+          checklist: [
+            { itemId: 'b1', concluido: true },
+            { itemId: 'b2', concluido: false }
+          ]
+        }]
+      },
+      {
+        name: 'Desenhar',
+        activities: [{
+          code: 'DES_A',
+          checklist: []
+        }]
+      },
+      {
+        name: 'Implementar',
+        activities: [{
+          code: 'IMPL_A',
+          checklist: [
+            { itemId: 'c1', concluido: true },
+            { itemId: 'c2', concluido: true }
+          ]
+        }]
+      }
+    ]
+  };
+
+  const metrics = context.ProcessManager.getProcessChecklistMetrics(processo);
+  assert.equal(metrics.total, 7);
+  assert.equal(metrics.completed, 4);
+  assert.equal(metrics.pending, 3);
+  assert.equal(metrics.percent, 57);
+
+  const dashboard = context.DashboardManager;
+  const dashboardMetrics = dashboard.calculateNgeDashboardMetrics([processo]);
+  assert.equal(dashboardMetrics.checklist.total, 7);
+  assert.equal(dashboardMetrics.checklist.completed, 4);
+  assert.equal(dashboardMetrics.checklist.pending, 3);
+});
+
+test('setores são manualmente cadastrados e as atividades pendentes contam uma vez por processo/atividade', () => {
+  const context = createSandbox();
+  const dashboardPath = path.join(__dirname, '..', '..', 'public', 'js', 'dashboard.js');
+  const processesPath = path.join(__dirname, '..', '..', 'public', 'js', 'processes.js');
+
+  vm.runInNewContext(`${fs.readFileSync(dashboardPath, 'utf8')}\nthis.DashboardManager = DashboardManager;`, context, { filename: dashboardPath });
+  vm.runInNewContext(`${fs.readFileSync(processesPath, 'utf8')}\nthis.ProcessManager = ProcessManager;`, context, { filename: processesPath });
+
+  assert.equal(context.ProcessManager.availableSetores.length, 0);
+
+  const processo = {
+    id: 10,
+    nome: 'Processo de regressão manual',
+    setor_id: 99,
+    phases: [
+      {
+        name: 'Planejar',
+        activities: [
+          { code: 'PLAN_A', checklist: [{ concluido: true }, { concluido: false }], concluida: false },
+          { code: 'PLAN_B', checklist: [{ concluido: true }, { concluido: true }], concluida: true }
+        ]
+      },
+      {
+        name: 'Analisar',
+        activities: [
+          { code: 'ANAL_A', checklist: [{ concluido: false }, { concluido: false }], concluida: false },
+          { code: 'ANAL_B', checklist: [{ concluido: true }, { concluido: true }], concluida: true }
+        ]
+      }
+    ]
+  };
+
+  const metrics = context.DashboardManager.calculateNgeDashboardMetrics([processo]);
+  assert.equal(metrics.activities.total, 4);
+  assert.equal(metrics.activities.completed, 2);
+  assert.equal(metrics.activities.pending, 2);
 });

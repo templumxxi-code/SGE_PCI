@@ -4,13 +4,28 @@
 
 const bcryptjs = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { verifyPassword, createUser, listUsers, findUserById, findUserByEmail, updateUser, changePassword } = require('../models/userStore');
+const userRepository = require('../repositories/userRepository');
+const { createSession } = require('../repositories/sessionRepository');
+const { query } = require('../models/db');
+const { getPermissions, recordLoginAttempt, failedAttemptsSince } = require('../repositories/securityRepository');
 const { normalizePerfil, isProfileAllowed } = require('../services/roles');
 
 const createAuthError = (message, statusCode = 401) => {
     const error = new Error(message);
     error.statusCode = statusCode;
     return error;
+};
+
+const recordAuthAudit = async (userId, action, request = null) => {
+    try {
+        await query(
+            `INSERT INTO audit_logs (user_id, action, entity, entity_id, new_data, ip)
+             VALUES ($1, $2, 'authentication', $3, $4, $5)`,
+            [userId || null, action, userId ? String(userId) : null, JSON.stringify({}), request?.ip || null]
+        );
+    } catch (error) {
+        console.error('Falha ao registrar auditoria de autenticacao:', error.message);
+    }
 };
 
 /**
@@ -20,9 +35,9 @@ const createAuthError = (message, statusCode = 401) => {
  * @param {string} perfil (opcional)
  * @returns {Promise}
  */
-const login = async (email, senha, perfilSolicitado = null) => {
+const login = async (email, senha, perfilSolicitado = null, request = null) => {
+    const emailNormalizado = String(email || '').trim().toLowerCase();
     try {
-        const emailNormalizado = String(email || '').trim().toLowerCase();
         const senhaInformada = String(senha || '');
 
         if (!emailNormalizado || !senhaInformada || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalizado)) {
@@ -30,14 +45,26 @@ const login = async (email, senha, perfilSolicitado = null) => {
         }
 
         if (senhaInformada.length < 8) {
+            await recordLoginAttempt(emailNormalizado, request?.ip, false, 'INVALID_CREDENTIALS');
             throw createAuthError('Credenciais inválidas.');
         }
 
-        const usuario = await verifyPassword(emailNormalizado, senhaInformada);
+        if (await failedAttemptsSince(emailNormalizado) >= 5) {
+            throw createAuthError('Usuário temporariamente bloqueado', 423);
+        }
+
+        const usuarioEncontrado = await userRepository.findUserByEmail(emailNormalizado);
+        const usuario = usuarioEncontrado && await bcryptjs.compare(senhaInformada, usuarioEncontrado.passwordHash)
+            ? usuarioEncontrado
+            : null;
 
         if (!usuario || !usuario.active) {
+            await recordLoginAttempt(emailNormalizado, request?.ip, false, 'INVALID_CREDENTIALS');
+            await recordAuthAudit(usuario?.id, 'LOGIN_FAILED', request);
             throw createAuthError('Credenciais inválidas.');
         }
+
+        const permissions = await getPermissions(usuario.id);
 
         // Se um perfil foi solicitado, validar se o usuário tem esse perfil
         let perfilNormalizado = normalizePerfil(usuario.perfil || usuario.role);
@@ -63,10 +90,15 @@ const login = async (email, senha, perfilSolicitado = null) => {
                 nome: usuario.nome,
                 perfil: perfilNormalizado,
                 setor_id: usuario.setor_id || usuario.sectorId || null
+                ,permissions
             },
             process.env.JWT_SECRET,
             { expiresIn: process.env.JWT_EXPIRES_IN || '15m' }
         );
+        const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+        await createSession(usuario.id, token, expiresAt);
+        await recordLoginAttempt(emailNormalizado, request?.ip, true, 'LOGIN_SUCCESS');
+        await recordAuthAudit(usuario.id, 'LOGIN_SUCCESS', request);
 
         return {
             token,
@@ -90,6 +122,7 @@ const login = async (email, senha, perfilSolicitado = null) => {
         if (error.statusCode) {
             throw error;
         }
+        await recordLoginAttempt(emailNormalizado, request?.ip, false, 'INVALID_CREDENTIALS').catch(() => {});
         throw createAuthError('Credenciais inválidas.');
     }
 };
@@ -125,30 +158,20 @@ const registrar = async (userData) => {
             throw new Error('A senha deve ter pelo menos 8 caracteres');
         }
 
-        const usuarioExistente = await findUserByEmail(email);
+        const usuarioExistente = await userRepository.findUserByEmail(email);
         if (usuarioExistente) {
             throw new Error('E-mail já cadastrado');
         }
 
-        const resultado = await createUser({
+        const passwordHash = await bcryptjs.hash(String(senha), 12);
+        const resultado = await userRepository.createUser({
             nome,
-            name: nome,
-            registration,
+            matricula: registration,
             email,
-            senha,
-            perfis: perfisNormalizados,
-            perfil: perfilPrincipal,
-            role: perfilPrincipal,
-            organizationType,
-            organizationUnitId,
-            instituteId,
-            regionalId,
-            advisoryId,
-            nucleusId,
-            sectorId: sectorId ?? setor_id,
-            setor_id: sectorId ?? setor_id,
-            active: active !== false,
-            observations
+            passwordHash,
+            roleCode: perfilPrincipal,
+            organizationalUnitId: organizationUnitId,
+            mustChangePassword: true
         });
 
         return resultado;
@@ -163,7 +186,7 @@ const registrar = async (userData) => {
  */
 const listarUsuarios = async () => {
     try {
-        return listUsers().map((usuario) => ({
+        return (await userRepository.findAllUsers()).map((usuario) => ({
             ...usuario,
             perfil: normalizePerfil(usuario.perfil)
         }));
@@ -176,7 +199,7 @@ const listarUsuarios = async () => {
  * Listar somente os dados necessários para o seletor de login.
  */
 const listarOpcoesLogin = async () => {
-    return listUsers()
+    return userRepository.findAllUsers()
         .filter((usuario) => usuario.active !== false)
         .map((usuario) => ({
             id: usuario.id,
@@ -193,7 +216,7 @@ const listarOpcoesLogin = async () => {
  */
 const obterUsuario = async (usuarioId) => {
     try {
-        const usuario = await findUserById(usuarioId);
+        const usuario = await userRepository.findUserById(usuarioId);
 
         if (!usuario) {
             return null;
@@ -219,12 +242,13 @@ const atualizarUsuario = async (usuarioId, userData) => {
         const { nome, email, perfil, setor_id, ativo } = userData;
         const perfilNormalizado = perfil ? normalizePerfil(perfil) : null;
 
-        const usuarioAtualizado = await updateUser(usuarioId, {
+        const usuarioAtualizado = await userRepository.updateUser(usuarioId, {
             nome,
+            matricula: userData.matricula,
             email,
-            perfil: perfilNormalizado,
-            setor_id,
-            active: ativo
+            roleCode: perfilNormalizado,
+            organizationalUnitId: userData.organizationUnitId,
+            ativo
         });
 
         if (!usuarioAtualizado) {
@@ -249,7 +273,7 @@ const atualizarUsuario = async (usuarioId, userData) => {
  */
 const alterarSenha = async (usuarioId, senhaAtual, novaSenha) => {
     try {
-        const usuario = await findUserById(usuarioId);
+        const usuario = await userRepository.findUserById(usuarioId);
 
         if (!usuario) {
             throw new Error('Usuário não encontrado');
@@ -260,7 +284,9 @@ const alterarSenha = async (usuarioId, senhaAtual, novaSenha) => {
             throw new Error('Senha atual inválida');
         }
 
-        await changePassword(usuarioId, novaSenha);
+        const passwordHash = await bcryptjs.hash(String(novaSenha), 12);
+        await userRepository.changePassword(usuarioId, passwordHash);
+        await recordAuthAudit(usuarioId, 'PASSWORD_CHANGED');
 
         return { mensagem: 'Senha alterada com sucesso' };
     } catch (error) {
@@ -275,7 +301,7 @@ const alterarSenha = async (usuarioId, senhaAtual, novaSenha) => {
  */
 const deletarUsuario = async (usuarioId) => {
     try {
-        const usuario = await findUserById(usuarioId);
+        const usuario = await userRepository.findUserById(usuarioId);
 
         if (!usuario) {
             const err = new Error('Usuário não encontrado');
@@ -283,16 +309,15 @@ const deletarUsuario = async (usuarioId) => {
             throw err;
         }
 
-        // Soft delete - marcar como inativo
-        const resultado = await updateUser(usuarioId, { active: false, deletedAt: new Date().toISOString() });
-        
+        const resultado = await userRepository.disableUser(usuarioId);
+
         if (!resultado) {
-            const err = new Error('Erro ao atualizar usuário');
+            const err = new Error('Erro ao remover usuário');
             err.statusCode = 400;
             throw err;
         }
 
-        return { id: usuarioId, message: 'Usuário inativado com sucesso', usuario: resultado };
+        return { id: usuarioId, message: 'Usuário removido com sucesso', usuario: resultado };
     } catch (error) {
         throw error;
     }
@@ -306,7 +331,7 @@ const deletarUsuario = async (usuarioId) => {
 const obterPerfisDisponíveis = async (email) => {
     try {
         const emailNormalizado = String(email || '').trim().toLowerCase();
-        const usuario = await findUserByEmail(emailNormalizado);
+        const usuario = await userRepository.findUserByEmail(emailNormalizado);
 
         if (!usuario || !usuario.active) {
             return { perfis: [], encontrado: false };
@@ -339,13 +364,13 @@ const obterPerfisDisponíveis = async (email) => {
  */
 const atualizarStatusUsuario = async (usuarioId, active) => {
     try {
-        const usuario = await findUserById(usuarioId);
+        const usuario = await userRepository.findUserById(usuarioId);
 
         if (!usuario) {
             throw new Error('Usuário não encontrado');
         }
 
-        await updateUser(usuarioId, { active: Boolean(active) });
+        await userRepository.updateUser(usuarioId, { ativo: Boolean(active) });
 
         return { id: usuarioId, active: Boolean(active), message: 'Status atualizado com sucesso' };
     } catch (error) {
@@ -364,4 +389,5 @@ module.exports = {
     deletarUsuario,
     obterPerfisDisponíveis,
     atualizarStatusUsuario
+    ,recordAuthAudit
 };

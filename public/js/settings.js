@@ -48,12 +48,27 @@ class SettingsManager {
 
     static renderOrganizationStructure() {
         const organization = window.AccessControl?.getStoredOrganizationData?.() || { institutes: [], regionais: [], subcoordenações: [], assessorias: [], nuclei: [], sectors: [] };
-        document.getElementById('org-institutes-list').innerHTML = (organization.institutes || []).map(item => `<div><strong>${item.name}</strong><p>${item.active ? 'Ativo' : 'Inativo'}</p></div>`).join('') || '<p>Nenhum instituto cadastrado.</p>';
-        document.getElementById('org-regionais-list').innerHTML = (organization.regionais || []).map(item => `<div><strong>${item.name}</strong><p>${item.active ? 'Ativa' : 'Inativa'}</p></div>`).join('') || '<p>Nenhuma regional cadastrada.</p>';
-        document.getElementById('org-subcoord-list').innerHTML = (organization.subcoordenações || []).map(item => `<div><strong>${item.name}</strong><p>${item.parentType || 'Sem vínculo'}</p></div>`).join('') || '<p>Nenhuma subcoordenação cadastrada.</p>';
-        document.getElementById('org-assessorias-list').innerHTML = (organization.assessorias || []).map(item => `<div><strong>${item.name}</strong><p>${item.active ? 'Ativa' : 'Inativa'}</p></div>`).join('') || '<p>Nenhuma assessoria cadastrada.</p>';
-        document.getElementById('org-nuclei-list').innerHTML = (organization.nuclei || []).map(item => `<div><strong>${item.name}</strong><p>${item.parentType || 'Sem vínculo'}</p></div>`).join('') || '<p>Nenhum núcleo cadastrado.</p>';
-        document.getElementById('org-sectors-list').innerHTML = (organization.sectors || []).map(item => `<div><strong>${item.name}</strong><p>${item.nucleusId ? `Núcleo ${item.nucleusId}` : 'Sem núcleo'}</p></div>`).join('') || '<p>Nenhum setor cadastrado.</p>';
+        document.getElementById('org-institutes-list').innerHTML = (organization.institutes || []).map(item => `<div class="org-item"><div><strong>${item.name}</strong><p>${item.active ? 'Ativo' : 'Inativo'}</p></div><button type="button" class="btn btn-small btn-danger remove-organization-item" data-type="INSTITUTO" data-id="${item.id}">Remover</button></div>`).join('') || '<p>Nenhum instituto cadastrado.</p>';
+        document.getElementById('org-regionais-list').innerHTML = (organization.regionais || []).map(item => `<div class="org-item"><div><strong>${item.name}</strong><p>${item.active ? 'Ativa' : 'Inativa'}</p></div><button type="button" class="btn btn-small btn-danger remove-organization-item" data-type="REGIONAL" data-id="${item.id}">Remover</button></div>`).join('') || '<p>Nenhuma regional cadastrada.</p>';
+        document.getElementById('org-subcoord-list').innerHTML = (organization.subcoordenações || []).map(item => `<div class="org-item"><div><strong>${item.name}</strong><p>${item.parentType || 'Sem vínculo'}</p></div><button type="button" class="btn btn-small btn-danger remove-organization-item" data-type="SUBCOORDENACAO" data-id="${item.id}">Remover</button></div>`).join('') || '<p>Nenhuma subcoordenação cadastrada.</p>';
+        document.getElementById('org-assessorias-list').innerHTML = (organization.assessorias || []).map(item => `<div class="org-item"><div><strong>${item.name}</strong><p>${item.active ? 'Ativa' : 'Inativa'}</p></div><button type="button" class="btn btn-small btn-danger remove-organization-item" data-type="ASSESSORIA" data-id="${item.id}">Remover</button></div>`).join('') || '<p>Nenhuma assessoria cadastrada.</p>';
+        document.getElementById('org-nuclei-list').innerHTML = (organization.nuclei || []).map(item => `<div class="org-item"><div><strong>${item.name}</strong><p>${item.parentType || 'Sem vínculo'}</p></div><button type="button" class="btn btn-small btn-danger remove-organization-item" data-type="NUCLEO" data-id="${item.id}">Remover</button></div>`).join('') || '<p>Nenhum núcleo cadastrado.</p>';
+        document.getElementById('org-sectors-list').innerHTML = (organization.sectors || []).map(item => `<div class="org-item"><div><strong>${item.name}</strong><p>${item.nucleusId ? `Núcleo ${item.nucleusId}` : 'Sem núcleo'}</p></div><button type="button" class="btn btn-small btn-danger remove-organization-item" data-type="SETOR" data-id="${item.id}">Remover</button></div>`).join('') || '<p>Nenhum setor cadastrado.</p>';
+
+        document.querySelectorAll('.remove-organization-item').forEach((button) => {
+            button.addEventListener('click', () => {
+                const type = button.dataset.type;
+                const id = button.dataset.id;
+                if (!type || !id) return;
+                const removed = window.AccessControl?.removeOrganizationItem?.(type, id);
+                if (removed) {
+                    this.renderOrganizationStructure();
+                    this.refreshOrganizationParentOptions();
+                    this.syncAvailableOrganizationTypes();
+                    if (typeof this.refreshFormFields === 'function') this.refreshFormFields();
+                }
+            });
+        });
     }
 
     static setupOrganizationForm() {
@@ -62,6 +77,11 @@ class SettingsManager {
         const parentGroup = document.getElementById('org-structure-parent-group');
         const parentSelect = document.getElementById('org-structure-parent');
         const saveBtn = document.getElementById('org-structure-save');
+
+        if (!form || form.dataset.eventsBound === 'true') {
+            return;
+        }
+        form.dataset.eventsBound = 'true';
 
         const populateParentOptions = () => {
             const organization = window.AccessControl?.getStoredOrganizationData?.() || { institutes: [], regionais: [], subcoordenações: [], assessorias: [], nuclei: [], sectors: [] };
@@ -81,10 +101,18 @@ class SettingsManager {
         populateParentOptions();
     }
 
+    static normalizeOrganizationName(value) {
+        return String(value || '').trim().toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
+
+    static organizationSaveInProgress = false;
+
     static createOrganizationItem() {
+        if (this.organizationSaveInProgress) return;
         const type = document.getElementById('org-structure-type')?.value || 'INSTITUTO';
         const nameInput = document.getElementById('org-structure-name');
         const parentSelect = document.getElementById('org-structure-parent');
+        const saveBtn = document.getElementById('org-structure-save');
         const name = nameInput?.value.trim();
 
         if (!name) {
@@ -104,34 +132,59 @@ class SettingsManager {
 
         const targetKey = keyMap[type];
         const list = Array.isArray(organization[targetKey]) ? organization[targetKey] : [];
-        const nextId = list.reduce((max, item) => Math.max(max, Number(item.id) || 0), 0) + 1;
-        const baseItem = {
-            id: nextId,
-            name,
-            active: true,
-            createdAt: new Date().toISOString()
-        };
-
-        if (type === 'NUCLEO') {
-            baseItem.parentType = 'INSTITUTO';
-            baseItem.parentUnitId = parentSelect?.value ? Number(parentSelect.value) : null;
-        } else if (type === 'SETOR') {
-            baseItem.nucleusId = parentSelect?.value ? Number(parentSelect.value) : null;
-            baseItem.parentType = 'NUCLEO';
-            baseItem.parentUnitId = parentSelect?.value ? Number(parentSelect.value) : null;
-        } else if (type === 'SUBCOORDENACAO') {
-            baseItem.parentType = 'REGIONAL';
-            baseItem.parentId = parentSelect?.value ? Number(parentSelect.value) : null;
+        const normalizedName = this.normalizeOrganizationName(name);
+        const duplicate = list.find(item => item.active !== false && this.normalizeOrganizationName(item.name) === normalizedName);
+        if (duplicate) {
+            this.showOrganizationError(`Já existe uma ${type === 'ASSESSORIA' ? 'Assessoria' : 'estrutura'} cadastrada com esse nome.`);
+            return;
         }
 
-        const nextOrganization = { ...organization, [targetKey]: [...list, baseItem] };
-        window.AccessControl?.saveOrganizationData?.(nextOrganization);
-        this.renderOrganizationStructure();
-        this.refreshOrganizationParentOptions();
-        this.syncAvailableOrganizationTypes();
-        this.refreshFormFields();
-        if (nameInput) nameInput.value = '';
-        this.clearOrganizationError();
+        this.organizationSaveInProgress = true;
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.dataset.originalText = saveBtn.textContent;
+            saveBtn.textContent = 'Salvando...';
+        }
+
+        try {
+            const nextId = list.reduce((max, item) => Math.max(max, Number(item.id) || 0), 0) + 1;
+            const baseItem = {
+                id: nextId,
+                name,
+                active: true,
+                createdAt: new Date().toISOString()
+            };
+
+            if (type === 'NUCLEO') {
+                baseItem.parentType = 'INSTITUTO';
+                baseItem.parentUnitId = parentSelect?.value ? Number(parentSelect.value) : null;
+            } else if (type === 'SETOR') {
+                baseItem.nucleusId = parentSelect?.value ? Number(parentSelect.value) : null;
+                baseItem.parentType = 'NUCLEO';
+                baseItem.parentUnitId = parentSelect?.value ? Number(parentSelect.value) : null;
+            } else if (type === 'SUBCOORDENACAO') {
+                baseItem.parentType = 'REGIONAL';
+                baseItem.parentId = parentSelect?.value ? Number(parentSelect.value) : null;
+            }
+
+            const nextOrganization = { ...organization, [targetKey]: [...list, baseItem] };
+            window.AccessControl?.saveOrganizationData?.(nextOrganization);
+            this.renderOrganizationStructure();
+            this.refreshOrganizationParentOptions();
+            this.syncAvailableOrganizationTypes();
+            if (typeof this.refreshFormFields === 'function') this.refreshFormFields();
+            if (nameInput) nameInput.value = '';
+            this.clearOrganizationError();
+        } catch (error) {
+            console.error('Erro ao salvar unidade organizacional:', error);
+            this.showOrganizationError('Não foi possível salvar a unidade. Tente novamente.');
+        } finally {
+            this.organizationSaveInProgress = false;
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = saveBtn.dataset.originalText || 'Salvar Unidade';
+            }
+        }
     }
 
     static refreshOrganizationParentOptions() {
@@ -202,6 +255,16 @@ class SettingsManager {
         document.getElementById('new-user-organization-type')?.addEventListener('change', () => this.refreshFormFields());
         this.syncAvailableOrganizationTypes();
         this.refreshFormFields();
+    }
+
+    static refreshFormFields() {
+        const form = document.getElementById('add-user-form');
+        if (!form) return;
+
+        this.syncAvailableOrganizationTypes();
+        this.renderUserForm();
+        this.renderUserAssignmentSummary();
+        this.validateUserForm();
     }
 
     static syncAvailableOrganizationTypes() {
@@ -634,7 +697,7 @@ class SettingsManager {
     }
 
     static validateUserForm() {
-        const fields = ['new-user-name', 'new-user-registration', 'new-user-email', 'new-user-role', 'new-user-password', 'new-user-confirm-password'];
+        const fields = ['new-user-name', 'new-user-registration', 'new-user-email', 'new-user-role', 'new-user-lotacao', 'new-user-password', 'new-user-confirm-password'];
         const errors = [];
         const nome = document.getElementById('new-user-name')?.value.trim();
         const registration = document.getElementById('new-user-registration')?.value.trim();
@@ -670,6 +733,9 @@ class SettingsManager {
         if (!perfil) {
             errors.push({ field: 'new-user-role', message: 'Selecione o perfil.' });
         }
+        if (perfil && perfil !== 'NGE' && !document.getElementById('new-user-lotacao')?.value) {
+            errors.push({ field: 'new-user-lotacao', message: 'Selecione a lotação do usuário.' });
+        }
         if (!senha) {
             errors.push({ field: 'new-user-password', message: 'Informe a senha temporária.' });
         } else if (senha.length < 8) {
@@ -689,10 +755,7 @@ class SettingsManager {
             sectorId
         });
         assignmentValidation.errors.forEach((message) => {
-            if (perfil === 'CHEFE_NUCLEO') errors.push({ field: 'new-user-nucleus', message });
-            else if (['CHEFE_SETOR', 'OPERACIONAL'].includes(perfil)) errors.push({ field: 'new-user-sector', message });
-            else if (['DIRETOR_INSTITUTO', 'SUBCOORDENADOR_INSTITUTO', 'SUBCOORDENADOR_REGIONAL', 'ASSESSOR'].includes(perfil)) errors.push({ field: 'new-user-unit', message });
-            else errors.push({ field: 'new-user-role', message });
+            errors.push({ field: 'new-user-lotacao', message });
         });
 
         const existingUsers = window.AccessControl?.getStoredUsers?.() || [];
@@ -768,19 +831,14 @@ class SettingsManager {
             return;
         }
 
+        const assignment = this.buildUserOrganizationalAssignment();
         const payload = {
             nome: document.getElementById('new-user-name')?.value.trim(),
             registration: document.getElementById('new-user-registration')?.value.trim(),
             email: document.getElementById('new-user-email')?.value.trim(),
             senha: document.getElementById('new-user-password')?.value,
             perfil: document.getElementById('new-user-role')?.value,
-            organizationType: document.getElementById('new-user-organization-type')?.value || '',
-            organizationUnitId: document.getElementById('new-user-unit')?.value || null,
-            instituteId: document.getElementById('new-user-organization-type')?.value === 'INSTITUTO' ? document.getElementById('new-user-unit')?.value || null : null,
-            regionalId: document.getElementById('new-user-organization-type')?.value === 'REGIONAL' ? document.getElementById('new-user-unit')?.value || null : null,
-            advisoryId: document.getElementById('new-user-organization-type')?.value === 'ASSESSORIA' ? document.getElementById('new-user-unit')?.value || null : null,
-            nucleusId: document.getElementById('new-user-nucleus')?.value || null,
-            sectorId: document.getElementById('new-user-sector')?.value || null,
+            ...assignment,
             active: document.getElementById('new-user-status')?.value === 'true',
             observations: document.getElementById('new-user-observations')?.value.trim()
         };
@@ -812,9 +870,7 @@ class SettingsManager {
         const usuarios = window.AccessControl?.getStoredUsers?.() || [];
         const search = document.getElementById('user-table-search')?.value.trim().toLowerCase() || '';
         const profileFilter = document.getElementById('user-table-profile-filter')?.value || '';
-        const unitFilter = document.getElementById('user-table-unit-filter')?.value || '';
-        const nucleusFilter = document.getElementById('user-table-nucleus-filter')?.value || '';
-        const sectorFilter = document.getElementById('user-table-sector-filter')?.value || '';
+        const lotacaoFilter = document.getElementById('user-table-lotacao-filter')?.value || '';
         const statusFilter = document.getElementById('user-table-status-filter')?.value || '';
 
         return usuarios.filter((usuario) => {
@@ -822,19 +878,15 @@ class SettingsManager {
             const email = (usuario.email || '').toLowerCase();
             const registration = (usuario.registration || '').toLowerCase();
             const perfil = String(usuario.perfil || usuario.role || '').toUpperCase();
-            const unit = String(usuario.organizationUnitId || usuario.unitId || usuario.instituteId || usuario.regionalId || usuario.advisoryId || usuario.nucleusId || '').toLowerCase();
-            const nucleus = String(usuario.nucleusId || '').toLowerCase();
-            const sector = String(usuario.sectorId || usuario.setor_id || '').toLowerCase();
+            const assignment = this.resolveLegacyUserAssignment(usuario);
             const status = usuario.active !== false ? 'true' : 'false';
 
             const matchesSearch = !search || nome.includes(search) || email.includes(search) || registration.includes(search);
             const matchesProfile = !profileFilter || perfil === profileFilter;
-            const matchesUnit = !unitFilter || unit === unitFilter.toLowerCase();
-            const matchesNucleus = !nucleusFilter || nucleus === nucleusFilter.toLowerCase();
-            const matchesSector = !sectorFilter || sector === sectorFilter.toLowerCase();
+            const matchesLotacao = !lotacaoFilter || assignment.key === lotacaoFilter;
             const matchesStatus = !statusFilter || status === statusFilter;
 
-            return matchesSearch && matchesProfile && matchesUnit && matchesNucleus && matchesSector && matchesStatus;
+            return matchesSearch && matchesProfile && matchesLotacao && matchesStatus;
         });
     }
 
@@ -843,9 +895,16 @@ class SettingsManager {
         if (!tbody) return;
 
         const rows = Array.isArray(usuarios) ? usuarios : [];
+        const lotacaoFilter = document.getElementById('user-table-lotacao-filter');
+        if (lotacaoFilter) {
+            const current = lotacaoFilter.value;
+            lotacaoFilter.innerHTML = '<option value="">Todas as lotações</option>' + this.getAllOrganizationalAssignments().map(item => `<option value="${item.key}">${item.path}</option>`).join('');
+            lotacaoFilter.value = current;
+        }
         tbody.innerHTML = rows.map((usuario) => {
             const perfil = String(usuario.perfil || usuario.role || '').toUpperCase();
-            const unitName = usuario.organizationUnitId ? `Unidade ${usuario.organizationUnitId}` : (usuario.setor_nome || usuario.setorName || usuario.sectorId || usuario.setor_id || '-');
+            const assignment = this.resolveLegacyUserAssignment(usuario);
+            const unitName = assignment.path || usuario.setor_nome || usuario.setorName || 'Não informado';
             const status = usuario.active === false ? 'Inativo' : 'Ativo';
             const roleLabel = this.getRoleLabel(perfil);
 
@@ -856,13 +915,12 @@ class SettingsManager {
                     <td>${usuario.email || '-'}</td>
                     <td>${roleLabel}</td>
                     <td>${unitName}</td>
-                    <td>${usuario.nucleusId || '-'}</td>
-                    <td>${usuario.sectorId || usuario.setor_id || '-'}</td>
                     <td>${status}</td>
                     <td>
                         <button class="btn btn-small btn-primary view-user-btn" type="button" data-user-id="${usuario.id}">Visualizar</button>
                         <button class="btn btn-small btn-secondary edit-user-btn" type="button" data-user-id="${usuario.id}">Editar</button>
                         <button class="btn btn-small btn-success activate-user-btn" type="button" data-user-id="${usuario.id}">${usuario.active === false ? 'Ativar' : 'Inativar'}</button>
+                        <button class="btn btn-small btn-danger delete-user-btn" type="button" data-user-id="${usuario.id}">Remover</button>
                     </td>
                 </tr>
             `;
@@ -870,6 +928,12 @@ class SettingsManager {
 
         tbody.querySelectorAll('.edit-user-btn').forEach((btn) => {
             btn.addEventListener('click', () => this.editUser(btn.dataset.userId, rows));
+        });
+        tbody.querySelectorAll('.delete-user-btn').forEach((btn) => {
+            btn.addEventListener('click', async () => {
+                const userId = btn.dataset.userId;
+                await this.removeUser(userId);
+            });
         });
         tbody.querySelectorAll('.activate-user-btn').forEach((btn) => {
             btn.addEventListener('click', async () => {
@@ -888,6 +952,31 @@ class SettingsManager {
                 }
             });
         });
+    }
+
+    static async removeUser(userId) {
+        if (!userId) return;
+        const confirmed = window.confirm('Deseja remover este login do sistema?');
+        if (!confirmed) return;
+
+        try {
+            await api.deleteUser(userId);
+            await this.loadUsers();
+            this.clearErrors();
+            this.showErrors(['Login removido com sucesso.']);
+            setTimeout(() => this.clearErrors(), 2500);
+        } catch (error) {
+            const removed = window.AccessControl?.removeStoredUser?.(userId);
+            if (removed) {
+                await this.loadUsers();
+                this.clearErrors();
+                this.showErrors(['Login removido localmente com sucesso.']);
+                setTimeout(() => this.clearErrors(), 2500);
+                return;
+            }
+            console.error('Erro ao remover usuário:', error);
+            this.showErrors(['Não foi possível remover o login.']);
+        }
     }
 
     static async setUserStatus(userId, active) {
@@ -915,12 +1004,14 @@ class SettingsManager {
         document.getElementById('new-user-email').value = user.email || '';
         document.getElementById('new-user-role').value = String(user.perfil || user.role || '');
         document.getElementById('new-user-status').value = user.active === false ? 'false' : 'true';
-        document.getElementById('new-user-organization-type').value = user.organizationType || this.getDefaultOrganizationTypeForProfile(String(user.perfil || user.role || '')) || '';
-        document.getElementById('new-user-unit').value = user.organizationUnitId || user.instituteId || user.regionalId || user.advisoryId || user.nucleusId || '';
-        document.getElementById('new-user-nucleus').value = user.nucleusId || '';
-        document.getElementById('new-user-sector').value = user.sectorId || user.setor_id || '';
         document.getElementById('new-user-observations').value = user.observations || '';
         this.renderUserForm();
+        const assignment = this.resolveLegacyUserAssignment(user);
+        const lotacao = document.getElementById('new-user-lotacao');
+        if (lotacao && assignment.key) {
+            lotacao.value = assignment.key;
+            this.renderUserAssignmentSummary();
+        }
     }
 
     static async saveUser() {
@@ -964,6 +1055,14 @@ class SettingsManager {
         const roleSelect = document.getElementById('new-user-role');
         if (roleSelect) {
             roleSelect.addEventListener('change', () => this.handleUserRoleChange());
+        }
+
+        const lotacaoSelect = document.getElementById('new-user-lotacao');
+        if (lotacaoSelect) {
+            lotacaoSelect.addEventListener('change', () => {
+                this.renderUserAssignmentSummary();
+                this.validateUserForm();
+            });
         }
 
         const orgTypeSelect = document.getElementById('new-user-organization-type');
@@ -1028,11 +1127,17 @@ class SettingsManager {
             statusFilter.addEventListener('change', () => this.renderUsersTable(this.getFilteredUsers()));
         }
 
+        const lotacaoFilter = document.getElementById('user-table-lotacao-filter');
+        if (lotacaoFilter) {
+            lotacaoFilter.addEventListener('change', () => this.renderUsersTable(this.getFilteredUsers()));
+        }
+
         const clearButton = document.getElementById('clear-user-filters-btn');
         if (clearButton) {
             clearButton.addEventListener('click', () => {
                 if (searchInput) searchInput.value = '';
                 if (profileFilter) profileFilter.value = '';
+                if (lotacaoFilter) lotacaoFilter.value = '';
                 if (statusFilter) statusFilter.value = '';
                 this.renderUsersTable(this.getFilteredUsers());
             });
@@ -1170,6 +1275,123 @@ class SettingsManager {
             alert('Erro ao inativar usuário: ' + error.message);
         }
     }
+
+    static getAllowedAssignmentTypesForRole(profile) {
+        const mapping = {
+            DIRETOR_INSTITUTO: ['INSTITUTO'],
+            SUBCOORDENADOR_INSTITUTO: ['INSTITUTO'],
+            SUBCOORDENADOR_REGIONAL: ['REGIONAL'],
+            ASSESSOR: ['ASSESSORIA'],
+            CHEFE_NUCLEO: ['NUCLEO'],
+            CHEFE_SETOR: ['SETOR'],
+            OPERACIONAL: ['SETOR']
+        };
+        return mapping[String(profile || '').toUpperCase()] || [];
+    }
+
+    static getAllOrganizationalAssignments() {
+        const org = window.AccessControl?.getStoredOrganizationData?.() || {};
+        const groups = [
+            ['INSTITUTO', 'Institutos', org.institutes || []],
+            ['REGIONAL', 'Regionais', org.regionais || []],
+            ['ASSESSORIA', 'Assessorias', org.assessorias || []],
+            ['NUCLEO', 'Núcleos', org.nuclei || []],
+            ['SETOR', 'Setores', org.sectors || []]
+        ];
+        const all = [];
+        const find = (type, id) => groups.find(([groupType, , items]) => groupType === type)?.[2].find(item => String(item.id) === String(id)) || null;
+        const parentUnit = item => find('INSTITUTO', item?.parentUnitId || item?.instituteId) || find('REGIONAL', item?.parentUnitId || item?.regionalId) || find('ASSESSORIA', item?.parentUnitId || item?.assessoriaId);
+        const nucleus = item => find('NUCLEO', item?.nucleusId || item?.nucleoId);
+
+        groups.forEach(([type, label, items]) => items.filter(item => item.active !== false).forEach(item => {
+            const parent = type === 'NUCLEO' ? parentUnit(item) : type === 'SETOR' ? parentUnit(nucleus(item)) : null;
+            const parentNucleus = type === 'SETOR' ? nucleus(item) : null;
+            const path = [parent?.name, parentNucleus?.name, item.name].filter(Boolean);
+            const hierarchy = path.join(' → ');
+            const key = `${type}:${item.id}`;
+            all.push({ key, id: item.id, type, name: item.name, label, active: item.active !== false, parentId: parent?.id || null, parentType: parent ? (['INSTITUTO', 'REGIONAL', 'ASSESSORIA'].find(parentType => find(parentType, parent.id)) || null) : null, nucleusId: parentNucleus?.id || (type === 'NUCLEO' ? item.id : null), organizationUnitId: type === 'INSTITUTO' || type === 'REGIONAL' || type === 'ASSESSORIA' ? item.id : parent?.id || null, instituteId: type === 'INSTITUTO' ? item.id : parent?.instituteId || (parent && find('INSTITUTO', parent.id)?.id) || null, regionalId: type === 'REGIONAL' ? item.id : parent?.regionalId || (parent && find('REGIONAL', parent.id)?.id) || null, advisoryId: type === 'ASSESSORIA' ? item.id : parent?.assessoriaId || (parent && find('ASSESSORIA', parent.id)?.id) || null, sectorId: type === 'SETOR' ? item.id : null, path: hierarchy || item.name });
+        }));
+        return all;
+    }
+
+    static getAssignmentById(key) {
+        return this.getAllOrganizationalAssignments().find(item => item.key === key) || null;
+    }
+
+    static resolveLegacyUserAssignment(user = {}) {
+        const type = String(user.lotacaoType || user.organizationType || '').toUpperCase();
+        const id = user.lotacaoId || user.organizationUnitId || user.instituteId || user.regionalId || user.advisoryId || user.nucleusId || user.sectorId || user.setor_id;
+        const exact = this.getAssignmentById(`${type}:${id}`);
+        if (exact) return exact;
+        const fallbackType = user.sectorId || user.setor_id ? 'SETOR' : user.nucleusId ? 'NUCLEO' : type;
+        return this.getAssignmentById(`${fallbackType}:${id}`) || { key: '', path: user.setor_nome || user.setorName || 'Não informado' };
+    }
+
+    static renderUserAssignmentOptions() {
+        const select = document.getElementById('new-user-lotacao');
+        if (!select) return;
+        const profile = document.getElementById('new-user-role')?.value || '';
+        const allowed = this.getAllowedAssignmentTypesForRole(profile);
+        const groups = new Map();
+        this.getAllOrganizationalAssignments().forEach(item => {
+            if (!groups.has(item.type)) groups.set(item.type, { label: item.label, items: [] });
+            groups.get(item.type).items.push(item);
+        });
+        const current = select.value;
+        select.innerHTML = '<option value="">Selecione a lotação</option>';
+        if (String(profile).toUpperCase() === 'NGE') {
+            select.insertAdjacentHTML('beforeend', '<option value="NGE:NGE">NGE — Núcleo de Gestão Estratégica</option>');
+        }
+        groups.forEach((group, type) => {
+            const options = group.items.map(item => `<option value="${item.key}" ${allowed.length && !allowed.includes(type) ? 'disabled' : ''}>${item.name}${item.path !== item.name ? ` — ${item.path}` : ''}</option>`).join('');
+            if (options) select.insertAdjacentHTML('beforeend', `<optgroup label="${group.label}">${options}</optgroup>`);
+        });
+        if ([...select.options].some(option => option.value === current)) select.value = current;
+        this.renderUserAssignmentSummary();
+    }
+
+    static buildUserOrganizationalAssignment() {
+        const perfil = document.getElementById('new-user-role')?.value || '';
+        const key = document.getElementById('new-user-lotacao')?.value || '';
+        if (key === 'NGE:NGE' || String(perfil).toUpperCase() === 'NGE') return { perfil, organizationType: '', organizationUnitId: null, instituteId: null, regionalId: null, advisoryId: null, nucleusId: null, sectorId: null, lotacaoId: null, lotacaoType: 'NGE', unitName: 'NGE — Núcleo de Gestão Estratégica', nucleusName: null, sectorName: null };
+        const assignment = this.getAssignmentById(key);
+        if (!assignment) return { perfil, organizationType: '', organizationUnitId: null, instituteId: null, regionalId: null, advisoryId: null, nucleusId: null, sectorId: null, lotacaoId: null, lotacaoType: '' };
+        const org = window.AccessControl?.getStoredOrganizationData?.() || {};
+        const find = (list, id) => (org[list] || []).find(item => String(item.id) === String(id));
+        return { perfil, organizationType: assignment.type, organizationUnitId: assignment.organizationUnitId, instituteId: assignment.instituteId, regionalId: assignment.regionalId, advisoryId: assignment.advisoryId, nucleusId: assignment.nucleusId, sectorId: assignment.sectorId, lotacaoId: assignment.id, lotacaoType: assignment.type, unitName: assignment.path, nucleusName: find('nuclei', assignment.nucleusId)?.name || null, sectorName: find('sectors', assignment.sectorId)?.name || null };
+    }
+
+    static validateUserOrganizationalAssignment(userData = {}) {
+        const profile = String(userData.perfil || '').toUpperCase();
+        if (profile === 'NGE') return { valid: true, errors: [] };
+        const key = userData.lotacaoKey || document.getElementById('new-user-lotacao')?.value || '';
+        const assignment = this.getAssignmentById(key);
+        if (!assignment) return { valid: false, errors: ['Selecione a lotação do usuário.'] };
+        if (!assignment.active) return { valid: false, errors: ['Selecione uma lotação ativa.'] };
+        const allowed = this.getAllowedAssignmentTypesForRole(profile);
+        if (allowed.length && !allowed.includes(assignment.type)) return { valid: false, errors: ['A lotação selecionada não é compatível com o perfil escolhido.'] };
+        return { valid: true, errors: [] };
+    }
+
+    static renderUserForm() {
+        const role = document.getElementById('new-user-role');
+        const lotacao = document.getElementById('new-user-lotacao');
+        if (!role || !lotacao) return;
+        this.renderUserAssignmentOptions();
+        const profile = role.value;
+        lotacao.required = profile !== 'NGE';
+        lotacao.setAttribute('aria-required', profile !== 'NGE' ? 'true' : 'false');
+        lotacao.closest('.form-field')?.classList.toggle('field-required', profile !== 'NGE');
+    }
+
+    static renderUserAssignmentSummary() {
+        const summary = document.getElementById('new-user-assignment-summary');
+        if (!summary) return;
+        const assignment = this.buildUserOrganizationalAssignment();
+        summary.innerHTML = assignment.lotacaoId || assignment.lotacaoType === 'NGE'
+            ? `<strong>Perfil:</strong> ${this.getRoleLabel(assignment.perfil)}<br><strong>Lotação definida:</strong> ${assignment.unitName || assignment.path || 'NGE — Núcleo de Gestão Estratégica'}`
+            : '<strong>Lotação:</strong> Lotação ainda não definida.';
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1180,6 +1402,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // IMPORTANTE: Os event listeners principais são adicionados por setupUserForm() 
     // quando loadSettings() é chamado. Não adicionar novamente aqui para evitar conflitos.
-    document.getElementById('org-structure-type')?.addEventListener('change', () => SettingsManager.refreshOrganizationParentOptions());
-    document.getElementById('org-structure-save')?.addEventListener('click', () => SettingsManager.createOrganizationItem());
 });

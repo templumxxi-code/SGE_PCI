@@ -574,6 +574,11 @@ class SPMApp {
                     ProcessManager.loadProcesses();
                 }
                 break;
+            case 'aprovacoes':
+                if (typeof DashboardManager?.renderApprovalQueue === 'function') {
+                    DashboardManager.renderApprovalQueue(this.currentUser);
+                }
+                break;
             case 'indicadores':
                 if (typeof IndicatorManager?.loadIndicators === 'function') {
                     IndicatorManager.loadIndicators();
@@ -757,6 +762,23 @@ const NotificationCenter = {
             return Array.isArray(list) ? list.map((item) => this.normalizeNotification(item)).filter(Boolean) : [];
         } catch (error) {
             return [];
+        }
+    },
+
+    async syncFromApi() {
+        if (!window.bpmApi) return;
+        try {
+            const notifications = await window.bpmApi.getNotifications();
+            if (!Array.isArray(notifications)) return;
+            this.saveNotifications(notifications.map((item) => ({
+                ...item,
+                createdAt: item.created_at || item.createdAt,
+                readAt: item.read_at || item.readAt,
+                sourceEvent: item.type || item.sourceEvent
+            })));
+            this.renderNotificationBadge();
+        } catch (error) {
+            console.warn('Notificações API indisponíveis; usando cache local.', error.message);
         }
     },
 
@@ -1141,6 +1163,8 @@ const NotificationCenter = {
         });
 
         this.renderNotificationBadge();
+        this.syncFromApi();
+        this._apiRefreshTimer = setInterval(() => this.syncFromApi(), 30000);
     }
 };
 

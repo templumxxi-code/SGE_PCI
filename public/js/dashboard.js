@@ -4,6 +4,7 @@
 
 class DashboardManager {
     static chartInstances = {};
+    static refreshTimer = null;
     static DEFAULT_PHASE_LABELS = ['Planejar', 'Analisar', 'Desenhar', 'Implementar', 'Monitorar'];
 
     /**
@@ -98,6 +99,16 @@ class DashboardManager {
     }
 
     static getChecklistStats(processo, phaseName = null) {
+        if (typeof ProcessManager !== 'undefined' && ProcessManager.getProcessChecklistMetrics) {
+            const stats = ProcessManager.getProcessChecklistMetrics(processo, phaseName);
+            return {
+                total: stats.total,
+                completed: stats.completed,
+                pending: stats.pending,
+                percent: stats.percent
+            };
+        }
+
         let total = 0;
         let completed = 0;
         const phases = Array.isArray(processo?.phases) ? processo.phases : [];
@@ -107,19 +118,44 @@ class DashboardManager {
                 if (item?.concluido === true) completed += 1;
             }));
         });
-        return { total, completed, pending: total - completed };
+        return { total, completed, pending: total - completed, percent: total ? Math.round((completed / total) * 100) : 0 };
     }
 
     static getActivityStats(processes) {
+        const seen = new Set();
         return (processes || []).reduce((result, processo) => {
-            (processo.phases || []).forEach(phase => (phase.activities || []).forEach(activity => {
-                const checklist = Array.isArray(activity.checklist) ? activity.checklist : [];
-                if (!checklist.length) return;
+            (processo.phases || []).forEach((phase, phaseIndex) => (phase.activities || []).forEach((activity, activityIndex) => {
+                const key = `${processo.id}:${phase.name || phaseIndex}:${activity.code || activity.id || activity.title || activityIndex}`;
+                if (seen.has(key)) return;
+                seen.add(key);
+
+                const stats = typeof ProcessManager !== 'undefined' && ProcessManager.getActivityChecklistMetrics
+                    ? ProcessManager.getActivityChecklistMetrics(activity)
+                    : { total: Array.isArray(activity.checklist) ? activity.checklist.length : 0, completed: (Array.isArray(activity.checklist) ? activity.checklist : []).filter(item => item?.concluido === true).length, pending: 0, percent: 0 };
+
+                const isCompleted = activity?.concluida === true || activity?.status === 'concluida' || activity?.status === 'concluído' || activity?.status === 'concluido' || (stats.total > 0 && stats.completed === stats.total);
                 result.total += 1;
-                if (checklist.every(item => item?.concluido === true)) result.completed += 1;
+                if (isCompleted) result.completed += 1;
+                else if (result.available === 0) result.available += 1;
+                else result.blocked += 1;
             }));
+            result.pending = result.available + result.blocked;
             return result;
-        }, { total: 0, completed: 0, pending: 0 });
+        }, { total: 0, completed: 0, pending: 0, available: 0, blocked: 0 });
+    }
+
+    static renderActivityOverview(activities) {
+        const total = Number(activities?.total || 0);
+        const values = {
+            completed: Number(activities?.completed || 0),
+            available: Number(activities?.available || 0),
+            blocked: Number(activities?.blocked || 0)
+        };
+        document.querySelectorAll('[data-activity-overview-total]').forEach((element) => { element.textContent = `${total} atividades`; });
+        Object.entries(values).forEach(([key, value]) => {
+            document.querySelectorAll(`[data-activity-overview-count="${key}"]`).forEach((element) => { element.textContent = this.formatNumber(value); });
+            document.querySelectorAll(`[data-activity-overview-segment="${key}"]`).forEach((element) => { element.style.width = `${total ? (value / total) * 100 : 0}%`; });
+        });
     }
 
     static getProcessIndicators(processes) {
@@ -223,23 +259,13 @@ class DashboardManager {
             const subtitle = document.getElementById('dashboard-nge-subtitle');
             if (title) title.textContent = context.dashboardTitle;
             if (subtitle) subtitle.textContent = context.dashboardSubtitle;
-            const localProcesses = this.getNgeDashboardProcesses();
-            if (Array.isArray(localProcesses)) {
-                const dadosLocais = this.buildDashboardFromLocalProcesses(localProcesses, window.app?.currentUser, this.dashboardFilters || {});
-                this.updateNgeDashboard(dadosLocais);
-                this.renderConformanceChart(dadosLocais);
-                this.renderDistributionChart(dadosLocais);
-                this.renderTemporalEvolutionChart(dadosLocais, 'chart-evolucao-temporal-nge', 'empty-evolucao-temporal');
-                this.populateAttentionTable(dadosLocais);
-                return;
-            }
-
-            const dados = await api.get('/reports/dashboard');
+            const dados = window.bpmApi ? await window.bpmApi.getDashboard('nge') : await api.get('/reports/dashboard');
             this.updateNgeDashboard(dados);
             this.renderConformanceChart(dados);
             this.renderDistributionChart(dados);
             this.renderTemporalEvolutionChart(dados, 'chart-evolucao-temporal-nge', 'empty-evolucao-temporal');
             this.populateAttentionTable(dados);
+            this.scheduleRefresh('nge');
         } catch (error) {
             console.error('Erro ao carregar dashboard NGE:', error);
         }
@@ -256,15 +282,23 @@ class DashboardManager {
             const subtitle = document.getElementById('dashboard-setor-subtitle');
             if (title) title.textContent = context.dashboardTitle;
             if (subtitle) subtitle.textContent = context.dashboardSubtitle;
-            const localProcesses = this.getNgeDashboardProcesses();
-            const dadosLocais = this.buildDashboardFromLocalProcesses(localProcesses, currentUser, this.dashboardScopedFilters || {});
-            this.renderScopedDashboardFilters(currentUser, dadosLocais.processes || []);
-            this.updateSetorDashboard(dadosLocais);
-            this.renderSetorProgressChart(dadosLocais);
-            this.renderTemporalEvolutionChart(dadosLocais, 'chart-evolucao-temporal', 'empty-evolucao-temporal-setor');
+            const dados = window.bpmApi ? await window.bpmApi.getDashboard('unit') : await api.get('/reports/dashboard');
+            this.renderScopedDashboardFilters(currentUser, dados.processes || []);
+            this.updateSetorDashboard(dados);
+            this.renderSetorProgressChart(dados);
+            this.renderTemporalEvolutionChart(dados, 'chart-evolucao-temporal', 'empty-evolucao-temporal-setor');
+            this.scheduleRefresh('unit');
         } catch (error) {
             console.error('Erro ao carregar dashboard do setor:', error);
         }
+    }
+
+    static scheduleRefresh(scope) {
+        if (this.refreshTimer) clearTimeout(this.refreshTimer);
+        this.refreshTimer = setTimeout(() => {
+            if (scope === 'nge') this.loadNGEDashboard();
+            else this.loadSetorDashboard();
+        }, 30000);
     }
 
     static formatNumber(value) {
@@ -302,6 +336,7 @@ class DashboardManager {
         detail('[data-metric-detail="processos-ativos"]', `Processos em execução: ${execution} • Homologados: ${homologados}`);
         detail('[data-metric-detail="conformidade"]', `${this.formatNumber(dados.checklist.completed)} de ${this.formatNumber(dados.checklist.total)} checklists concluídos`);
         detail('[data-metric-detail="atividades-total-nge"]', `Concluídas: ${this.formatNumber(dados.atividades.concluidas)} • Pendentes: ${this.formatNumber(dados.atividades.pendentes)}`);
+        this.renderActivityOverview(dados.activityOverview || dados.activities);
         this.renderPhaseSummaries(dados);
         this.renderStrategicIndicators(dados);
     }
@@ -334,6 +369,7 @@ class DashboardManager {
         detail('[data-metric-detail="conformidade-setor"]', `${this.formatNumber(dados.checklist.completed)} de ${this.formatNumber(dados.checklist.total)} checklists concluídos`);
         detail('[data-metric-detail="atividades-concluidas-setor"]', 'Atividades com checklist concluído');
         detail('[data-metric-detail="atividades-pendentes-setor"]', 'Aguardando conclusão');
+        this.renderActivityOverview(dados.activityOverview || dados.activities);
         this.renderPhaseSummaries({ ...dados, indicadores: dados.indicadores || { conformidadeMedia: 0 } });
         this.renderScopedIndicators(dados);
     }
@@ -640,6 +676,56 @@ class DashboardManager {
         if (distribution) distribution.innerHTML = `<span>Em execução: <strong>${Math.max(0, (dados.active || 0) - (dados.processes || []).filter(item => String(item.currentApprovalStatus || '').toUpperCase() === 'HOMOLOGADO').length)}</strong></span><span>Em Monitorar: <strong>${(dados.distribution || []).find(item => item.name === 'Monitorar')?.count || 0}</strong></span><span>Ciclos BPM concluídos: <strong>${(dados.processes || []).filter(item => String(item.status_fase || '').toLowerCase().includes('conclu')).length}</strong></span>`;
     }
 
+    static renderApprovalQueue(user = null) {
+        const currentUser = user || window.app?.currentUser || {};
+        const processes = typeof ProcessManager !== 'undefined' ? ProcessManager.getStoredProcesses?.() || [] : [];
+        const queue = window.AccessControl?.getApprovalQueueForUser?.(currentUser, processes) || [];
+        const metrics = window.AccessControl?.getApprovalQueueMetrics?.(currentUser, processes) || { pendencias: 0, revisoes: 0, homologados: 0 };
+
+        const pendenciasElement = document.querySelector('[data-metric="pendencias-aprovacao"]');
+        const revisaoElement = document.querySelector('[data-metric="fluxos-revisao"]');
+        if (pendenciasElement) pendenciasElement.textContent = String(metrics.pendencias || 0);
+        if (revisaoElement) revisaoElement.textContent = String(metrics.revisoes || 0);
+
+        const queueList = document.getElementById('approval-queue-list');
+        if (queueList) {
+            if (!queue.length) {
+                queueList.innerHTML = '<div class="approval-item empty-state"><strong>Sem pendências</strong><p>Nenhum processo exige resposta de aprovação para o seu perfil neste momento.</p></div>';
+                return;
+            }
+
+            queueList.innerHTML = queue.map((processo) => {
+                const status = String(processo.currentApprovalStatus || 'RASCUNHO').toUpperCase();
+                const statusLabel = window.AccessControl?.getApprovalStatusLabel?.(status) || status.replace(/_/g, ' ');
+                const unit = processo.unidade_nome || processo.setor_nome || processo.organizationType || 'Unidade';
+                const badgeClass = status === 'DEVOLVIDO_PARA_CORRECAO' ? 'badge-warning' : 'badge-info';
+                return `
+                    <div class="approval-item">
+                        <strong>${this.escapeHtml(processo.nome || `Processo ${processo.id}`)}</strong>
+                        <p>${this.escapeHtml(unit)} · ${this.escapeHtml(statusLabel)}</p>
+                        <span class="badge ${badgeClass}">${this.escapeHtml(statusLabel)}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        const scopeList = document.getElementById('approval-scope-list');
+        if (scopeList) {
+            const scopeItems = [
+                { title: 'Escopo visível', text: 'Instituto, Regional, Assessoria, Núcleo e Setor conforme perfil atual.' },
+                { title: 'Regra de bloqueio', text: 'Perfis com escopo restrito não visualizam ou aprovam unidades fora do seu alcance.' },
+                { title: 'Fila ativa', text: `${metrics.pendencias || 0} pendência(s) para o perfil atual.` },
+                { title: 'Correções', text: `${metrics.revisoes || 0} processo(s) devolvidos para correção.` }
+            ];
+            scopeList.innerHTML = scopeItems.map((item) => `
+                <div class="approval-item">
+                    <strong>${this.escapeHtml(item.title)}</strong>
+                    <p>${this.escapeHtml(item.text)}</p>
+                </div>
+            `).join('');
+        }
+    }
+
     static renderStrategicIndicators(dados) {
         const indicators = dados.indicators || [];
         const counters = this.getCountermeasures(dados.processes || []);
@@ -756,6 +842,15 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         refreshFilterOptions();
         const refreshDashboard = () => { refreshFilterOptions(); dashboard.loadNGEDashboard(); };
+        const dashboardSearchInput = filterContainer?.querySelector('[data-nge-search="search"]');
+        if (dashboardSearchInput) {
+            dashboardSearchInput.value = dashboard.dashboardFilters?.search || '';
+            dashboardSearchInput.addEventListener('input', (event) => {
+                dashboard.dashboardFilters = dashboard.dashboardFilters || {};
+                dashboard.dashboardFilters.search = event.target.value.trim();
+                refreshDashboard();
+            });
+        }
         filterContainer?.addEventListener('change', (event) => {
             const filter = event.target.closest('[data-nge-filter]');
             if (!filter) return;

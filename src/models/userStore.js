@@ -89,6 +89,9 @@ const ensureStorageDirectory = () => {
 };
 
 const createDefaultSeed = () => {
+    const { getTestCredential } = require('../../test/helpers/test-credentials');
+    const adminCred = getTestCredential('admin');
+    const setorCred = getTestCredential('setor');
     const now = new Date().toISOString();
     return [
         {
@@ -96,8 +99,8 @@ const createDefaultSeed = () => {
             nome: 'Admin NGE',
             name: 'Admin NGE',
             registration: '0001',
-            email: 'admin@pci.rn.gov.br',
-            passwordHash: bcryptjs.hashSync('admin123', 12),
+            email: adminCred.email,
+            passwordHash: bcryptjs.hashSync(adminCred.senha, 12),
             perfil: 'NGE',
             role: 'NGE',
             organizationType: 'NGE',
@@ -317,6 +320,18 @@ const updateUser = async (id, updates) => {
     return sanitizeUser(nextUser);
 };
 
+const deleteUser = async (id) => {
+    const users = readUsers().map(normalizeUser).filter(Boolean);
+    const userToDelete = users.find((user) => Number(user.id) === Number(id));
+    if (!userToDelete) {
+        return null;
+    }
+
+    const remainingUsers = users.filter((user) => Number(user.id) !== Number(id));
+    writeUsers(remainingUsers);
+    return sanitizeUser(userToDelete);
+};
+
 const changePassword = async (id, senhaNova) => {
     const users = readUsers().map(normalizeUser).filter(Boolean);
     const index = users.findIndex((user) => Number(user.id) === Number(id));
@@ -340,6 +355,7 @@ module.exports = {
     verifyPassword,
     createUser,
     updateUser,
+    deleteUser,
     changePassword,
     resetStore,
     normalizeProfile,

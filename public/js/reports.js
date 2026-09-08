@@ -236,11 +236,15 @@ class ReportManager {
             // Obter o blob do PDF
             const blob = await response.blob();
 
+            const disposition = response.headers.get('Content-Disposition') || '';
+            const filenameMatch = disposition.match(/filename="?([^";]+)"?/i);
+            const downloadFilename = filenameMatch ? filenameMatch[1] : filename;
+
             // Criar um link temporário e fazer o download
             const blobUrl = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = blobUrl;
-            link.download = filename;
+            link.download = downloadFilename;
             link.style.display = 'none';
             document.body.appendChild(link);
             link.click();
