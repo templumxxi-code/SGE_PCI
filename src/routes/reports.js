@@ -629,10 +629,13 @@ router.post('/processes/:id/pop', verifyToken, async (req, res, next) => {
         // Buscar atividades do processo
         const atividadesQuery = typeof processoId === 'number'
             ? `
-                SELECT a.id, a.processo_id, a.fase, a.codigo, a.descricao, a.dados
+                SELECT a.id, sp.processo_id, sp.status_fase AS fase,
+                       'ACT-' || a.id AS codigo, a.descricao,
+                       '{}'::jsonb AS dados
                 FROM atividades a
-                WHERE a.processo_id = $1
-                ORDER BY a.fase, a.codigo
+                JOIN subprocessos sp ON sp.id = a.subprocesso_id
+                WHERE sp.processo_id = $1
+                ORDER BY sp.ordem, a.ordem, a.id
             `
             : `
                 SELECT a.id, ph.process_id AS processo_id, ph.phase_name AS fase,
