@@ -1487,7 +1487,8 @@ class ProcessManager {
 
             const action = target.dataset.action;
             const rawProcessId = target.dataset.processId || target.dataset.processoId || target.dataset.id;
-            const processId = rawProcessId ? parseInt(rawProcessId, 10) : null;
+            // PostgreSQL uses UUIDs for BPM processes; keep the identifier intact.
+            const processId = rawProcessId || null;
             const phaseCode = target.dataset.phaseCode || target.dataset.phase || target.dataset.phaseName;
             const activityCode = target.dataset.activityCode || target.dataset.activity || target.dataset.activityCode;
 
