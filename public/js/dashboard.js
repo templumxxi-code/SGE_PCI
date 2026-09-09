@@ -24,17 +24,17 @@ class DashboardManager {
         const user = window.AccessControl?.normalizeUser?.(currentUser || window.app?.currentUser || {}) || currentUser || {};
         const profile = String(user.accessProfileKey || user.perfil || '').toUpperCase();
         const unitName = this.getOrganizationUnitName(user);
-        if (profile === 'NGE_ADMIN' || profile === 'NGE') return { scopeType: 'NGE', scopeId: null, scopeName: 'Polícia Científica do Rio Grande do Norte', dashboardTitle: 'Dashboard Institucional', dashboardSubtitle: 'Acompanhamento dos processos da Polícia Científica do Rio Grande do Norte' };
+        if (profile === 'NGE_ADMIN' || profile === 'NGE') return { scopeType: 'NGE', scopeId: null, scopeName: 'Polícia Científica do Rio Grande do Norte', dashboardTitle: 'Dashboard Institucional', dashboardSubtitle: 'Acompanhamento dos Projetos de Melhoria da Polícia Científica do Rio Grande do Norte' };
         const contexts = {
-            DIRETOR_INSTITUTO: ['Dashboard do Instituto', `Acompanhamento dos processos do Instituto ${unitName}`, 'INSTITUTO'],
-            SUBCOORDENADOR_INSTITUTO: ['Dashboard do Instituto', `Acompanhamento dos processos do Instituto ${unitName}`, 'INSTITUTO'],
-            SUBCOORDENADOR_REGIONAL: ['Dashboard da Regional', `Acompanhamento dos processos da Regional ${unitName}`, 'REGIONAL'],
-            ASSESSOR: ['Dashboard da Assessoria', `Acompanhamento dos processos da ${unitName}`, 'ASSESSORIA'],
-            SUBCOORDENADOR_FINANCEIRA: ['Dashboard da Assessoria', `Acompanhamento dos processos da ${unitName}`, 'ASSESSORIA'],
-            SUBCOORDENADOR_ADMINISTRATIVA: ['Dashboard da Assessoria', `Acompanhamento dos processos da ${unitName}`, 'ASSESSORIA'],
-            CHEFE_NUCLEO: ['Dashboard do Núcleo', `Acompanhamento dos processos do Núcleo ${unitName}`, 'NUCLEO'],
-            CHEFE_SETOR: ['Dashboard do Setor', `Acompanhamento dos processos do Setor ${unitName}`, 'SETOR'],
-            OPERACIONAL: ['Dashboard do Setor', `Acompanhamento dos processos do Setor ${unitName}`, 'SETOR']
+            DIRETOR_INSTITUTO: ['Dashboard do Instituto', `Acompanhamento dos Projetos de Melhoria do Instituto ${unitName}`, 'INSTITUTO'],
+            SUBCOORDENADOR_INSTITUTO: ['Dashboard do Instituto', `Acompanhamento dos Projetos de Melhoria do Instituto ${unitName}`, 'INSTITUTO'],
+            SUBCOORDENADOR_REGIONAL: ['Dashboard da Regional', `Acompanhamento dos Projetos de Melhoria da Regional ${unitName}`, 'REGIONAL'],
+            ASSESSOR: ['Dashboard da Assessoria', `Acompanhamento dos Projetos de Melhoria da ${unitName}`, 'ASSESSORIA'],
+            SUBCOORDENADOR_FINANCEIRA: ['Dashboard da Assessoria', `Acompanhamento dos Projetos de Melhoria da ${unitName}`, 'ASSESSORIA'],
+            SUBCOORDENADOR_ADMINISTRATIVA: ['Dashboard da Assessoria', `Acompanhamento dos Projetos de Melhoria da ${unitName}`, 'ASSESSORIA'],
+            CHEFE_NUCLEO: ['Dashboard do Núcleo', `Acompanhamento dos Projetos de Melhoria do Núcleo ${unitName}`, 'NUCLEO'],
+            CHEFE_SETOR: ['Dashboard do Setor', `Acompanhamento dos Projetos de Melhoria do Setor ${unitName}`, 'SETOR'],
+            OPERACIONAL: ['Dashboard do Setor', `Acompanhamento dos Projetos de Melhoria do Setor ${unitName}`, 'SETOR']
         };
         const [dashboardTitle, dashboardSubtitle, scopeType] = contexts[profile] || contexts.OPERACIONAL;
         return { scopeType, scopeId: user.organizationUnitId || user.unitId || user.sectorId || null, scopeName: unitName, dashboardTitle, dashboardSubtitle };
