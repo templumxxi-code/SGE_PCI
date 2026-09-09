@@ -620,24 +620,32 @@ router.post('/processes/:id/pop', verifyToken, async (req, res, next) => {
         }
         
         // Verificar permissão
-        if (req.user.perfil === 'SETOR' && processo.setor_id !== req.user.setor_id) {
+        if (req.user.perfil === 'SETOR' && processo.setor_id != null && processo.setor_id !== req.user.setor_id) {
             return res.status(403).json({ error: 'Acesso negado' });
         }
 
         console.log(`[POP] Processo encontrado: ${processo.nome}`);
 
         // Buscar atividades do processo
-        const atividadesQuery = typeof processoId === 'number'
-            ? `
-                SELECT a.id, sp.processo_id, sp.status_fase AS fase,
-                       'ACT-' || a.id AS codigo, a.descricao,
-                       '{}'::jsonb AS dados
-                FROM atividades a
-                JOIN subprocessos sp ON sp.id = a.subprocesso_id
-                WHERE sp.processo_id = $1
-                ORDER BY sp.ordem, a.ordem, a.id
-            `
-            : `
+        let atividadesResult = [];
+        if (typeof processoId === 'number') {
+            const legacyTables = await queryMany(
+                `SELECT to_regclass('public.subprocessos') AS subprocessos,
+                        to_regclass('public.atividades') AS atividades`
+            );
+            if (legacyTables[0]?.subprocessos && legacyTables[0]?.atividades) {
+                atividadesResult = await queryMany(`
+                    SELECT a.id, sp.processo_id, sp.status_fase AS fase,
+                           'ACT-' || a.id AS codigo, a.descricao,
+                           '{}'::jsonb AS dados
+                    FROM atividades a
+                    JOIN subprocessos sp ON sp.id = a.subprocesso_id
+                    WHERE sp.processo_id = $1
+                    ORDER BY sp.ordem, a.ordem, a.id
+                `, [processoId]);
+            }
+        } else {
+            atividadesResult = await queryMany(`
                 SELECT a.id, ph.process_id AS processo_id, ph.phase_name AS fase,
                        a.activity_code AS codigo, a.description AS descricao,
                        '{}'::jsonb AS dados
@@ -645,9 +653,8 @@ router.post('/processes/:id/pop', verifyToken, async (req, res, next) => {
                 JOIN process_phases ph ON ph.id = a.phase_id
                 WHERE ph.process_id = $1
                 ORDER BY ph.phase_order, a.created_at
-            `;
-
-        const atividadesResult = await queryMany(atividadesQuery, [processoId]);
+            `, [processoId]);
+        }
         console.log(`[POP] Atividades encontradas: ${atividadesResult ? atividadesResult.length : 0}`);
 
         // Organizar dados por atividade
