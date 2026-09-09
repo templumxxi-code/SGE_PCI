@@ -509,6 +509,31 @@ ja possua Docker Engine ativo. Depois, repetir `docker --version`,
 `docker build --no-cache -t smp-pci-release-candidate .`, iniciar o container e
 validar `/api/health` com HTTP 200.
 
+## DEPLOY RAILWAY CONFIRMADO
+
+- Projeto Railway: `vivacious-passion`.
+- Servico: `web`.
+- PostgreSQL Railway: provisionado e conectado por referencia `DATABASE_URL`.
+- Variaveis obrigatorias de producao: configuradas fora do Git.
+- Commit de correcao: `5e5019a fix: lazy-load mock routes for production`.
+- Deploy final: ativo e concluido com sucesso.
+- Health publico: HTTP 200 em `/api/health`.
+- Resposta do health: `status=ok` e `database=connected`.
+- Correcao aplicada: rotas mock agora sao carregadas somente quando
+  `USE_MOCK_API=true`, evitando dependencia de arquivos de teste na imagem.
+
+```text
+GITHUB_READY=YES
+SECRETS_SAFE=YES
+DATABASE_CONFIG_READY=YES
+RAILWAY_READY=YES
+TESTS=PASS
+AUDIT=PASS
+DEPLOY=PASS
+HEALTH_PUBLIC=PASS
+DATABASE_CONNECTED=YES
+```
+
 ## FINAL RELEASE CANDIDATE
 
 ```text
