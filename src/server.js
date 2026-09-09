@@ -71,7 +71,13 @@ app.use(cors({
 
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ limit: '1mb', extended: true }));
-app.use(express.static(path.join(__dirname, '../public')));
+app.use(express.static(path.join(__dirname, '../public'), {
+    setHeaders: (res, filePath) => {
+        if (/\.(?:html|js|css)$/.test(filePath)) {
+            res.setHeader('Cache-Control', 'no-store');
+        }
+    }
+}));
 
 app.use((req, res, next) => {
     const timestamp = new Date().toISOString();
@@ -118,6 +124,8 @@ const configureApiRoutes = async () => {
         app.use('/api/processes', processRoutes);
         app.use('/api/indicators', indicatorRoutes);
         app.use('/api/reports', reportRoutes);
+        // Keep the legacy POP URL working for cached clients during rollout.
+        app.use('/api', reportRoutes);
         app.use('/api/planejar', planejarRoutes);
         app.use('/api', attachmentRoutes);
         app.use('/api/users', userRoutes);

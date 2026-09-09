@@ -10,6 +10,23 @@ const { verifyToken, requireAdmin } = require('../middleware/auth');
 const legacyUserId = (req) => req.user.legacyUserId ?? req.user.id;
 
 /**
+ * GET /api/indicators
+ * Listar todos os indicadores visíveis ao usuário.
+ */
+router.get('/', verifyToken, async (req, res, next) => {
+    try {
+        if (req.user.perfil === 'SETOR') {
+            return res.json(await indicatorController.obterIndicadoresSetor(req.user.setor_id, legacyUserId(req), req.user.perfil));
+        }
+
+        const indicadores = await indicatorController.listarTodosIndicadores();
+        res.json(indicadores);
+    } catch (error) {
+        next(error);
+    }
+});
+
+/**
  * POST /api/indicators
  * Criar indicador
  */

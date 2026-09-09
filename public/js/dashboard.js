@@ -313,32 +313,41 @@ class DashboardManager {
      * Atualizar métricas do dashboard NGE
      */
     static updateNgeDashboard(dados) {
+        const safeData = {
+            ...dados,
+            processos: dados?.processos || { total: 0 },
+            indicadores: dados?.indicadores || { conformidadeMedia: 0 },
+            atividades: dados?.atividades || { total: 0, concluidas: 0, pendentes: 0 },
+            checklist: dados?.checklist || { total: 0, completed: 0 },
+            processes: Array.isArray(dados?.processes) ? dados.processes : [],
+            attention: Array.isArray(dados?.attention) ? dados.attention : []
+        };
         const processosContainer = document.querySelector('[data-metric="processos-ativos"]');
         const conformidadeContainer = document.querySelector('[data-metric="conformidade"]');
         const atividadesContainer = document.querySelector('[data-metric="atividades-total-nge"]');
         const alertasContainer = document.querySelector('[data-metric="alertas-criticos-nge"]');
 
         if (processosContainer) {
-            processosContainer.textContent = this.formatNumber(dados.active ?? dados.processos.total);
+            processosContainer.textContent = this.formatNumber(safeData.active ?? safeData.processos.total);
         }
         if (conformidadeContainer) {
-            conformidadeContainer.textContent = this.formatPercent(dados.indicadores.conformidadeMedia);
+            conformidadeContainer.textContent = this.formatPercent(safeData.indicadores.conformidadeMedia);
         }
         if (atividadesContainer) {
-            atividadesContainer.textContent = this.formatNumber(dados.atividades.total);
+            atividadesContainer.textContent = this.formatNumber(safeData.atividades.total);
         }
         if (alertasContainer) {
-            alertasContainer.textContent = this.formatNumber((dados.attention || []).filter(item => item.severity === 'Crítico').length);
+            alertasContainer.textContent = this.formatNumber(safeData.attention.filter(item => item.severity === 'Crítico').length);
         }
         const detail = (selector, text) => { const element = document.querySelector(selector); if (element) element.textContent = text; };
-        const homologados = (dados.processes || []).filter(item => String(item.currentApprovalStatus || '').toUpperCase() === 'HOMOLOGADO').length;
-        const execution = Math.max(0, (dados.active || 0) - homologados);
+        const homologados = safeData.processes.filter(item => String(item.currentApprovalStatus || '').toUpperCase() === 'HOMOLOGADO').length;
+        const execution = Math.max(0, (safeData.active || 0) - homologados);
         detail('[data-metric-detail="processos-ativos"]', `Processos em execução: ${execution} • Homologados: ${homologados}`);
-        detail('[data-metric-detail="conformidade"]', `${this.formatNumber(dados.checklist.completed)} de ${this.formatNumber(dados.checklist.total)} checklists concluídos`);
-        detail('[data-metric-detail="atividades-total-nge"]', `Concluídas: ${this.formatNumber(dados.atividades.concluidas)} • Pendentes: ${this.formatNumber(dados.atividades.pendentes)}`);
-        this.renderActivityOverview(dados.activityOverview || dados.activities);
-        this.renderPhaseSummaries(dados);
-        this.renderStrategicIndicators(dados);
+        detail('[data-metric-detail="conformidade"]', `${this.formatNumber(safeData.checklist.completed)} de ${this.formatNumber(safeData.checklist.total)} checklists concluídos`);
+        detail('[data-metric-detail="atividades-total-nge"]', `Concluídas: ${this.formatNumber(safeData.atividades.concluidas)} • Pendentes: ${this.formatNumber(safeData.atividades.pendentes)}`);
+        this.renderActivityOverview(safeData.activityOverview || safeData.activities);
+        this.renderPhaseSummaries(safeData);
+        this.renderStrategicIndicators(safeData);
     }
 
     /**

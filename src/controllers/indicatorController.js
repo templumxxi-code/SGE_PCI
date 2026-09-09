@@ -73,6 +73,13 @@ const listarIndicadores = async (processoId, usuarioId, perfilUsuario) => {
     }
 };
 
+const listarTodosIndicadores = async () => queryMany(
+    `SELECT id, processo_id, nome, descricao, valor_meta, valor_atual, valor_anterior,
+            unidade_medida, tipo_indicador, periodicidade, atualizado_em
+     FROM indicadores
+     ORDER BY atualizado_em DESC`
+);
+
 /**
  * Obter detalhes de um indicador
  * @param {number} indicadorId
@@ -233,6 +240,7 @@ const calcularConformidade = async (processoId) => {
 
 module.exports = {
     listarIndicadores,
+    listarTodosIndicadores,
     obterIndicador,
     criarIndicador,
     atualizarValorIndicador,
