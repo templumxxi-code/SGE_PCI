@@ -92,6 +92,9 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '../public/index.html'));
 });
+app.get(['/modules', '/strategic-planning'], (req, res) => {
+    res.sendFile(path.join(__dirname, '../public/index.html'));
+});
 
 const configureApiRoutes = async () => {
     if (routesConfigured) {
@@ -111,6 +114,7 @@ const configureApiRoutes = async () => {
     const dashboardRoutes = require('./routes/dashboard');
     const notificationRoutes = require('./routes/notifications');
     const strategicReportRoutes = require('./routes/strategicReports');
+    const moduleRoutes = require('./routes/modules');
 
     const useMock = process.env.USE_MOCK_API === 'true';
     app.locals.authMode = useMock ? 'mock' : 'database';
@@ -121,6 +125,7 @@ const configureApiRoutes = async () => {
         console.log('✔️  API mock local ativada. Nenhum banco de dados é necessário.');
     } else {
         app.use('/api/auth', authRoutes);
+        app.use('/api', moduleRoutes);
         app.use('/api/processes', processRoutes);
         app.use('/api/indicators', indicatorRoutes);
         app.use('/api/reports', reportRoutes);

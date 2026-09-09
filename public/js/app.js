@@ -27,8 +27,12 @@ class SPMApp {
         localStorage.removeItem('sge_pci_current_user');
         const loginSection = document.getElementById('login-section');
         const dashboardSection = document.getElementById('dashboard-section');
+        const modulesSection = document.getElementById('modules-section');
+        const strategicSection = document.getElementById('strategic-planning-section');
         if (loginSection) loginSection.classList.add('active');
         if (dashboardSection) dashboardSection.classList.remove('active');
+        if (modulesSection) modulesSection.classList.remove('active');
+        if (strategicSection) strategicSection.classList.remove('active');
     }
 
     /**
@@ -194,6 +198,10 @@ class SPMApp {
             loginForm.addEventListener('submit', (e) => this.handleLogin(e));
         }
 
+        document.getElementById('modules-logout-btn')?.addEventListener('click', () => this.logout());
+        document.getElementById('strategic-back-btn')?.addEventListener('click', () => this.showModules());
+        window.addEventListener('popstate', () => this.handleModulePath());
+
         const togglePasswordBtn = document.getElementById('btn-toggle-password');
         const passwordInput = document.getElementById('password-input');
         if (togglePasswordBtn && passwordInput) {
@@ -271,7 +279,7 @@ class SPMApp {
                     this.currentUser.perfil = this.normalizeProfile(this.currentUser.perfil);
                     this.isAuthenticated = true;
                     window.AccessControl?.saveCurrentUser?.(this.currentUser);
-                    this.showDashboard();
+                    await this.handleModulePath();
                 } else {
                     this.logout();
                 }
@@ -283,7 +291,7 @@ class SPMApp {
             this.currentUser = storedUser;
             this.currentUser.perfil = this.normalizeProfile(this.currentUser.perfil || this.currentUser.role);
             this.isAuthenticated = true;
-            this.showDashboard();
+            await this.handleModulePath();
         } else {
             loginSection.classList.add('active');
             dashboardSection.classList.remove('active');
@@ -340,7 +348,7 @@ class SPMApp {
                 this.currentUser.perfil = this.normalizeProfile(this.currentUser.perfil);
                 this.isAuthenticated = true;
                 window.AccessControl?.saveCurrentUser?.(this.currentUser);
-                this.showDashboard();
+                await this.showModules();
                 document.getElementById('login-form').reset();
                 return;
             }
@@ -388,9 +396,13 @@ class SPMApp {
 
         const loginSection = document.getElementById('login-section');
         const dashboardSection = document.getElementById('dashboard-section');
+        const modulesSection = document.getElementById('modules-section');
+        const strategicSection = document.getElementById('strategic-planning-section');
 
         loginSection.classList.add('active');
         dashboardSection.classList.remove('active');
+        modulesSection?.classList.remove('active');
+        strategicSection?.classList.remove('active');
         document.getElementById('login-form').reset();
         if (window.NotificationCenter?.renderNotificationBadge) {
             window.NotificationCenter.renderNotificationBadge();
@@ -403,8 +415,12 @@ class SPMApp {
     showDashboard() {
         const loginSection = document.getElementById('login-section');
         const dashboardSection = document.getElementById('dashboard-section');
+        const modulesSection = document.getElementById('modules-section');
+        const strategicSection = document.getElementById('strategic-planning-section');
 
         loginSection.classList.remove('active');
+        modulesSection?.classList.remove('active');
+        strategicSection?.classList.remove('active');
         dashboardSection.classList.add('active');
 
         // Atualizar informações do usuário
@@ -421,6 +437,40 @@ class SPMApp {
 
         // Carregar dados iniciais
         this.loadDashboardData();
+    }
+
+    async showModules() {
+        document.getElementById('login-section')?.classList.remove('active');
+        document.getElementById('dashboard-section')?.classList.remove('active');
+        document.getElementById('strategic-planning-section')?.classList.remove('active');
+        document.getElementById('modules-section')?.classList.add('active');
+        history.replaceState({}, '', '/modules');
+        try {
+            await window.ModulesManager?.load();
+        } catch (error) {
+            console.error('Erro ao carregar módulos:', error);
+            if (error.message.includes('401')) this.logout();
+        }
+    }
+
+    async handleModulePath() {
+        if (!this.isAuthenticated) return;
+        if (window.location.pathname === '/strategic-planning') {
+            try {
+                const modules = await AuthManager.get('/modules');
+                if (!modules.some((module) => module.code === 'STRATEGIC_PLANNING')) {
+                    this.showModules();
+                    return;
+                }
+                document.getElementById('modules-section')?.classList.remove('active');
+                document.getElementById('dashboard-section')?.classList.remove('active');
+                document.getElementById('strategic-planning-section')?.classList.add('active');
+            } catch (error) {
+                this.showModules();
+            }
+            return;
+        }
+        this.showModules();
     }
 
     /**

@@ -7,12 +7,13 @@ const router = express.Router();
 const processController = require('../controllers/processController');
 const indicatorController = require('../controllers/indicatorController');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
+const { requireModule } = require('../middleware/moduleAccess');
 
 /**
  * GET /api/processes
  * Listar processos (com filtros)
  */
-router.get('/', verifyToken, async (req, res, next) => {
+router.get('/', verifyToken, requireModule('PROCESS_MANAGEMENT'), async (req, res, next) => {
     try {
         const filtros = {
             setor_id: req.query.setor_id ? parseInt(req.query.setor_id) : null,
@@ -33,7 +34,7 @@ router.get('/', verifyToken, async (req, res, next) => {
  * GET /api/processes/:id
  * Obter detalhes de um processo
  */
-router.get('/:id', verifyToken, async (req, res, next) => {
+router.get('/:id', verifyToken, requireModule('PROCESS_MANAGEMENT'), async (req, res, next) => {
     try {
         const processo = await processController.obterProcesso(req.params.id, req.user.legacyUserId, req.user.perfil);
 
@@ -51,7 +52,7 @@ router.get('/:id', verifyToken, async (req, res, next) => {
  * POST /api/processes
  * Criar novo processo
  */
-router.post('/', verifyToken, async (req, res, next) => {
+router.post('/', verifyToken, requireModule('PROCESS_MANAGEMENT'), async (req, res, next) => {
     try {
         const processo = await processController.criarProcesso(req.body, req.user.legacyUserId, req.user.perfil);
         res.status(201).json(processo);
@@ -64,7 +65,7 @@ router.post('/', verifyToken, async (req, res, next) => {
  * PUT /api/processes/:id
  * Atualizar processo
  */
-router.put('/:id', verifyToken, async (req, res, next) => {
+router.put('/:id', verifyToken, requireModule('PROCESS_MANAGEMENT'), async (req, res, next) => {
     try {
         const processoAtualizado = await processController.atualizarProcesso(req.params.id, req.body, req.user.legacyUserId, req.user.perfil);
         res.json(processoAtualizado);
@@ -77,7 +78,7 @@ router.put('/:id', verifyToken, async (req, res, next) => {
  * DELETE /api/processes/:id
  * Deletar processo (requer confirmação de senha do usuário no corpo: { senha })
  */
-router.delete('/:id', verifyToken, async (req, res, next) => {
+router.delete('/:id', verifyToken, requireModule('PROCESS_MANAGEMENT'), async (req, res, next) => {
     try {
         const { isGlobalAdmin } = require('../services/roles');
         const senha = req.body && req.body.senha ? String(req.body.senha) : null;
@@ -107,7 +108,7 @@ router.delete('/:id', verifyToken, async (req, res, next) => {
  * GET /api/processes/:id/indicadores
  * Listar indicadores de um processo
  */
-router.get('/:id/indicadores', verifyToken, async (req, res, next) => {
+router.get('/:id/indicadores', verifyToken, requireModule('PROCESS_MANAGEMENT'), async (req, res, next) => {
     try {
         const indicadores = await indicatorController.listarIndicadores(req.params.id, req.user.legacyUserId, req.user.perfil);
         res.json(indicadores);
@@ -120,7 +121,7 @@ router.get('/:id/indicadores', verifyToken, async (req, res, next) => {
  * GET /api/processes/estatisticas/geral
  * Obter estatísticas de processos
  */
-router.get('/estatisticas/geral', verifyToken, async (req, res, next) => {
+router.get('/estatisticas/geral', verifyToken, requireModule('PROCESS_MANAGEMENT'), async (req, res, next) => {
     try {
         const setorId = req.query.setor_id ? parseInt(req.query.setor_id) : null;
         const estatisticas = await processController.obterEstatisticas(setorId, req.user.legacyUserId, req.user.perfil);

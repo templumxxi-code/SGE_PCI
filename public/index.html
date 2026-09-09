@@ -16,6 +16,7 @@
     <link rel="stylesheet" type="text/css" href="./css/responsive.css">
     <link rel="stylesheet" type="text/css" href="./css/dark-mode.css">
     <link rel="stylesheet" type="text/css" href="./css/theme-button.css">
+    <link rel="stylesheet" type="text/css" href="./css/modules.css">
     
     <!-- Fonts -->
     <!-- Removido para evitar erros de DNS em ambiente offline -->
@@ -246,6 +247,35 @@
                     <div class="login-links">
                         <button id="btn-back-to-login" type="button" class="btn-link">Voltar ao Login</button>
                     </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="modules-section" class="modules-section">
+            <div class="modules-shell">
+                <div class="modules-header">
+                    <div>
+                        <p class="eyebrow">SGE PCI/RN</p>
+                        <h1>Selecione um módulo</h1>
+                        <p class="subtitle">Acesse os ambientes liberados para seu usuário.</p>
+                    </div>
+                    <button id="modules-logout-btn" type="button" class="btn btn-danger">Sair</button>
+                </div>
+                <div id="modules-list" class="modules-list"></div>
+            </div>
+        </section>
+
+        <section id="strategic-planning-section" class="modules-section">
+            <div class="modules-shell">
+                <div class="modules-header">
+                    <div>
+                        <p class="eyebrow">Planejamento Estratégico</p>
+                        <h1>Planejamento Estratégico</h1>
+                    </div>
+                    <button id="strategic-back-btn" type="button" class="btn btn-secondary">Voltar aos módulos</button>
+                </div>
+                <div class="module-empty">
+                    <p>Este módulo está em fase de desenvolvimento.</p>
                 </div>
             </div>
         </section>
@@ -1132,6 +1162,14 @@
                                 </tbody>
                             </table>
                         </div>
+
+                        <div class="settings-section">
+                            <h3>Permissões de módulos</h3>
+                            <p class="subtitle">Libere ou remova módulos para cada usuário.</p>
+                            <label for="module-user-select">Usuário</label>
+                            <select id="module-user-select" class="form-control"></select>
+                            <div id="module-permissions-list" class="module-permissions-list"></div>
+                        </div>
                     </div>
                 </div>
             </main>
@@ -1216,6 +1254,7 @@
     <script src="./js/dashboard.js"></script>
     <script src="./js/reports.js"></script>
     <script src="./js/settings.js"></script>
+    <script src="./js/modules.js"></script>
     <script src="./js/bpm-details.js"></script>
     <script src="./js/app.js"></script>
     <script src="./js/dark-mode.js"></script>

@@ -19,6 +19,9 @@ class SettingsManager {
             this.renderOrganizationStructure();
             this.setupOrganizationForm();
             this.setupUserForm();
+            if (canManage) {
+                await window.ModulesManager?.loadAdminPanel();
+            }
 
             if (!canManage) {
                 // Allow opening the form for inspection, but prevent saving for non-admins
