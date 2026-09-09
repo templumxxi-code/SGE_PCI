@@ -84,9 +84,13 @@ WHERE p.name IN (
   );
 
 INSERT INTO process_activities (
-    phase_id, activity_code, title, description, status, progress
+    phase_id, codigo, titulo, descricao, activity_code, title, description,
+    status, progress
 )
 SELECT ph.id, 'DEMO-' || ph.phase_code,
+       'Atividade demonstrativa - ' || ph.phase_name,
+       'Atividade criada para demonstracao do ciclo BPM',
+       'DEMO-' || ph.phase_code,
        'Atividade demonstrativa - ' || ph.phase_name,
        'Atividade criada para demonstracao do ciclo BPM',
        CASE WHEN ph.status = 'CONCLUIDA' THEN 'COMPLETED' ELSE 'PENDING' END,
