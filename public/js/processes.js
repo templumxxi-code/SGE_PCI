@@ -3283,7 +3283,7 @@ class ProcessManager {
                 };
 
                 // Fazer requisição POST para gerar POP
-                const response = await fetch(`/api/processes/${processoId}/pop`, {
+                const response = await fetch(`/api/reports/processes/${encodeURIComponent(processoId)}/pop`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`,

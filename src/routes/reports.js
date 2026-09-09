@@ -589,7 +589,8 @@ router.post('/processes/:id/pop', verifyToken, async (req, res, next) => {
         console.log('[POP] Iniciando geração de Procedimento Operacional Padrão');
         const POPGenerator = require('../services/popGenerator');
         
-        const processoId = parseInt(req.params.id, 10);
+        const rawProcessId = String(req.params.id || '');
+        const processoId = /^\d+$/.test(rawProcessId) ? parseInt(rawProcessId, 10) : rawProcessId;
         
         // Usar os dados enviados no body ou procurar no banco
         let processo = req.body.processo;
@@ -626,13 +627,23 @@ router.post('/processes/:id/pop', verifyToken, async (req, res, next) => {
         console.log(`[POP] Processo encontrado: ${processo.nome}`);
 
         // Buscar atividades do processo
-        const atividadesQuery = `
-            SELECT a.id, a.processo_id, a.fase, a.codigo, a.descricao, a.dados
-            FROM atividades a
-            WHERE a.processo_id = $1
-            ORDER BY a.fase, a.codigo
-        `;
-        
+        const atividadesQuery = typeof processoId === 'number'
+            ? `
+                SELECT a.id, a.processo_id, a.fase, a.codigo, a.descricao, a.dados
+                FROM atividades a
+                WHERE a.processo_id = $1
+                ORDER BY a.fase, a.codigo
+            `
+            : `
+                SELECT a.id, ph.process_id AS processo_id, ph.phase_name AS fase,
+                       a.activity_code AS codigo, a.description AS descricao,
+                       '{}'::jsonb AS dados
+                FROM process_activities a
+                JOIN process_phases ph ON ph.id = a.phase_id
+                WHERE ph.process_id = $1
+                ORDER BY ph.phase_order, a.created_at
+            `;
+
         const atividadesResult = await queryMany(atividadesQuery, [processoId]);
         console.log(`[POP] Atividades encontradas: ${atividadesResult ? atividadesResult.length : 0}`);
 
