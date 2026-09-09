@@ -4,6 +4,7 @@
   "description": "Sistema de Monitoramento de Processos BPM da Polícia Científica do RN",
   "main": "src/server.js",
   "scripts": {
+    "prestart": "node src/database/migrator.js",
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "migrate": "node src/database/migrator.js",
