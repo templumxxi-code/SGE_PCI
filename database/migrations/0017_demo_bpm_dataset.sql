@@ -22,6 +22,36 @@ WHERE NOT EXISTS (
     SELECT 1 FROM processes p WHERE p.name = v.name
 );
 
+INSERT INTO processes_v2 (
+    id, nome, descricao, organizational_unit_id, created_by,
+    responsible_user_id, current_phase, status
+)
+SELECT p.id, p.name, p.description, p.organizational_unit_id,
+       p.created_by, p.responsible_user_id,
+       CASE p.current_phase
+           WHEN 'PLAN' THEN 'Planejar'
+           WHEN 'ANALYZE' THEN 'Analisar'
+           WHEN 'DESIGN' THEN 'Desenhar'
+           WHEN 'IMPLEMENT' THEN 'Implementar'
+           WHEN 'MONITOR' THEN 'Monitorar'
+           ELSE p.current_phase
+       END,
+       CASE p.status
+           WHEN 'ACTIVE' THEN 'EM_ANDAMENTO'
+           WHEN 'COMPLETED' THEN 'HOMOLOGADO'
+           WHEN 'CANCELLED' THEN 'DEVOLVIDO'
+           ELSE 'EM_ELABORACAO'
+       END
+FROM processes p
+WHERE p.name IN (
+    'Pericia de documentos oficiais',
+    'Atendimento a solicitacoes externas',
+    'Inventario de equipamentos'
+)
+  AND NOT EXISTS (
+      SELECT 1 FROM processes_v2 existing WHERE existing.id = p.id
+  );
+
 INSERT INTO process_phases (
     process_id, phase_name, order_number, phase_code, phase_order,
     status, progress_percent
