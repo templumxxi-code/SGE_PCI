@@ -99,7 +99,7 @@ INSERT INTO indicadores (
 SELECT p.id, v.nome, 'KPI demonstrativo para apresentacao',
        v.meta, v.atual, v.unidade, v.tipo, v.periodicidade
 FROM (VALUES
-    ('Prazo medio de atendimento', 'dias', 10::numeric, 7::numeric, 'Eficiencia', 'Mensal'),
+    ('Prazo medio de atendimento', 'dias', 10::numeric, 7::numeric, 'Eficiência', 'Mensal'),
     ('Conformidade documental', '%', 95::numeric, 88::numeric, 'Conformidade', 'Mensal'),
     ('Satisfacao dos usuarios', '%', 90::numeric, 84::numeric, 'Qualidade', 'Trimestral')
 ) AS v(nome, unidade, meta, atual, tipo, periodicidade)
