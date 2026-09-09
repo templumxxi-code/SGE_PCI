@@ -19,7 +19,6 @@ try {
 }
 
 // Importar rotas
-const mockApiRoutes = require('./routes/mockApi');
 const db = require('./models/db');
 const { loginLimiter, resetLoginLimiter } = require('./middleware/loginLimiter');
 
@@ -111,6 +110,7 @@ const configureApiRoutes = async () => {
     app.locals.authMode = useMock ? 'mock' : 'database';
 
     if (useMock) {
+        const mockApiRoutes = require('./routes/mockApi');
         app.use('/api', mockApiRoutes);
         console.log('✔️  API mock local ativada. Nenhum banco de dados é necessário.');
     } else {
