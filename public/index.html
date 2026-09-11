@@ -17,6 +17,7 @@
     <link rel="stylesheet" type="text/css" href="./css/dark-mode.css">
     <link rel="stylesheet" type="text/css" href="./css/theme-button.css">
     <link rel="stylesheet" type="text/css" href="./css/modules.css">
+    <link rel="stylesheet" type="text/css" href="./css/home.css">
     
     <!-- Fonts -->
     <!-- Removido para evitar erros de DNS em ambiente offline -->
@@ -348,6 +349,9 @@
 
                 <!-- Navigation Tabs -->
                 <nav class="dashboard-nav">
+                    <button class="nav-item common-item active" data-tab="inicio" data-role="ALL">
+                        <i class="fas fa-home"></i> Início
+                    </button>
                     <button class="nav-item nge-only active" data-tab="dashboard-nge" data-role="NGE">
                         <i class="fas fa-chart-line"></i> Dashboard NGE
                     </button>
@@ -380,6 +384,106 @@
 
             <!-- Main Content -->
             <main class="dashboard-content">
+                <div id="inicio" class="tab-content active">
+                    <section class="home-banner">
+                        <div class="home-banner-content">
+                            <span class="home-kicker">MÓDULO DE GESTÃO</span>
+                            <h2>Gestão de Processos</h2>
+                            <p>Gerencie, acompanhe e melhore continuamente os processos institucionais com mais clareza, controle e decisões baseadas em dados.</p>
+                            <button class="btn btn-primary" data-home-tab="novo-processo" data-home-path="/processes/new">
+                                <i class="fas fa-plus-circle"></i> Novo Processo
+                            </button>
+                        </div>
+                        <div class="home-banner-mark" aria-hidden="true"><i class="fas fa-diagram-project"></i></div>
+                    </section>
+
+                    <section class="home-section">
+                        <div class="home-section-heading">
+                            <span class="home-kicker">CENTRAL DE COMANDO</span>
+                            <h3 class="home-section-title">O que você pode fazer neste módulo</h3>
+                            <p>Use as ferramentas abaixo para conduzir cada etapa da gestão dos processos institucionais.</p>
+                        </div>
+                        <div class="home-cards">
+                            <article class="home-card">
+                                <div class="home-card-icon"><i class="fas fa-plus-circle"></i></div>
+                                <h3>Criar Processos</h3>
+                                <p>Registre um novo processo, informe seu objetivo e organize as etapas iniciais.</p>
+                                <span class="home-card-actions">Definir informações, responsáveis e prazos.</span>
+                                <button class="btn btn-primary" data-home-tab="novo-processo" data-home-path="/processes/new">Iniciar Processo</button>
+                            </article>
+                            <article class="home-card">
+                                <div class="home-card-icon"><i class="fas fa-list-check"></i></div>
+                                <h3>Gerenciar Processos</h3>
+                                <p>Consulte processos sob sua responsabilidade e acompanhe a evolução de cada um.</p>
+                                <span class="home-card-actions">Filtrar, atualizar status e visualizar detalhes.</span>
+                                <button class="btn btn-primary" data-home-tab="meus-processos" data-home-path="/processes">Acessar Processos</button>
+                            </article>
+                            <article class="home-card">
+                                <div class="home-card-icon"><i class="fas fa-network-wired"></i></div>
+                                <h3>Monitoramento BPM</h3>
+                                <p>Acompanhe fases, atividades, pendências e o desempenho dos processos.</p>
+                                <span class="home-card-actions">Identificar gargalos e priorizar ações.</span>
+                                <button class="btn btn-primary" data-home-tab="monitoramento-bpm" data-home-path="/bpm">Acessar BPM</button>
+                            </article>
+                            <article class="home-card">
+                                <div class="home-card-icon"><i class="fas fa-chart-line"></i></div>
+                                <h3>Indicadores</h3>
+                                <p>Analise resultados e metas para entender o desempenho dos processos.</p>
+                                <span class="home-card-actions">Medir resultados e apoiar decisões.</span>
+                                <button class="btn btn-primary" data-home-tab="indicadores" data-home-path="/indicators">Acessar Indicadores</button>
+                            </article>
+                            <article class="home-card">
+                                <div class="home-card-icon"><i class="fas fa-file-lines"></i></div>
+                                <h3>Relatórios</h3>
+                                <p>Consulte informações consolidadas para análises e acompanhamento gerencial.</p>
+                                <span class="home-card-actions">Reunir evidências e comunicar resultados.</span>
+                                <button class="btn btn-primary" data-home-tab="relatorios" data-home-path="/reports">Acessar Relatórios</button>
+                            </article>
+                        </div>
+                    </section>
+
+                    <section class="home-section">
+                        <div class="home-section-heading">
+                            <span class="home-kicker">JORNADA DO PROCESSO</span>
+                            <h3 class="home-section-title">Como começar?</h3>
+                        </div>
+                        <div class="home-steps">
+                            <div class="home-step"><span class="home-step-number">1</span><strong>Criar Processo</strong></div>
+                            <div class="home-step"><span class="home-step-number">2</span><strong>Definir Responsáveis</strong></div>
+                            <div class="home-step"><span class="home-step-number">3</span><strong>Executar Atividades</strong></div>
+                            <div class="home-step"><span class="home-step-number">4</span><strong>Monitorar Indicadores</strong></div>
+                            <div class="home-step"><span class="home-step-number">5</span><strong>Melhorar Resultados</strong></div>
+                        </div>
+                    </section>
+
+                    <section class="home-section">
+                        <div class="home-section-heading">
+                            <span class="home-kicker">VISÃO ATUAL</span>
+                            <h3 class="home-section-title">Resumo do módulo</h3>
+                        </div>
+                    <div class="home-summary">
+                        <div class="home-metric"><i class="fas fa-spinner"></i><strong data-home-metric="processosAtivos">—</strong><span>Processos Ativos</span></div>
+                        <div class="home-metric"><i class="fas fa-circle-check"></i><strong data-home-metric="processosConcluidos">—</strong><span>Processos Concluídos</span></div>
+                        <div class="home-metric"><i class="fas fa-hourglass-half"></i><strong data-home-metric="atividadesPendentes">—</strong><span>Atividades Pendentes</span></div>
+                        <div class="home-metric"><i class="fas fa-bell"></i><strong data-home-metric="alertas">—</strong><span>Alertas</span></div>
+                    </div>
+                    </section>
+
+                    <section class="home-about">
+                        <div>
+                            <span class="home-kicker">VISÃO INSTITUCIONAL</span>
+                            <h3 class="home-section-title">Sobre a Gestão de Processos</h3>
+                            <p>A Gestão de Processos organiza o trabalho institucional de ponta a ponta, conectando pessoas, atividades e resultados em uma visão comum.</p>
+                        </div>
+                        <div class="home-benefits">
+                            <span><i class="fas fa-check"></i> Padronização</span>
+                            <span><i class="fas fa-check"></i> Transparência</span>
+                            <span><i class="fas fa-check"></i> Controle</span>
+                            <span><i class="fas fa-check"></i> Melhoria contínua</span>
+                            <span><i class="fas fa-check"></i> Decisões baseadas em dados</span>
+                        </div>
+                    </section>
+                </div>
                 
                 <!-- Dashboard NGE -->
                 <div id="dashboard-nge" class="tab-content active">
@@ -1259,6 +1363,7 @@
     <script src="./js/reports.js"></script>
     <script src="./js/settings.js"></script>
     <script src="./js/modules.js"></script>
+    <script src="./js/home.js"></script>
     <script src="./js/bpm-details.js"></script>
     <script src="./js/app.js"></script>
     <script src="./js/dark-mode.js"></script>

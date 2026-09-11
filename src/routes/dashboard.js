@@ -1,6 +1,7 @@
 const express = require('express');
 const { verifyToken } = require('../middleware/auth');
 const { authorize } = require('../middleware/authorize');
+const { requireModule } = require('../middleware/moduleAccess');
 const { getUserScope } = require('../middleware/scopeAccess');
 const { queryOne, query } = require('../models/db');
 
@@ -78,8 +79,8 @@ const summaryData = async (scope, queryParams = {}) => {
     return row;
 };
 
-router.get('/summary', verifyToken, authorize({ permissions: ['PROCESS_VIEW'] }), summary);
-router.get('/nge', verifyToken, authorize({ permissions: ['DASHBOARD_GLOBAL'] }), detail);
-router.get('/unit', verifyToken, authorize({ permissions: ['PROCESS_VIEW'] }), detail);
+router.get('/summary', verifyToken, requireModule('PROCESS_MANAGEMENT'), authorize({ permissions: ['PROCESS_VIEW'] }), summary);
+router.get('/nge', verifyToken, requireModule('PROCESS_MANAGEMENT'), authorize({ permissions: ['DASHBOARD_GLOBAL'] }), detail);
+router.get('/unit', verifyToken, requireModule('PROCESS_MANAGEMENT'), authorize({ permissions: ['PROCESS_VIEW'] }), detail);
 
 module.exports = router;

@@ -455,6 +455,21 @@ class SPMApp {
 
     async handleModulePath() {
         if (!this.isAuthenticated) return;
+        const moduleRoutes = {
+            '/processes/new': 'novo-processo',
+            '/processes': 'meus-processos',
+            '/dashboard': window.AccessControl?.isNGE?.(this.currentUser) ? 'dashboard-nge' : 'dashboard-setor',
+            '/bpm': 'monitoramento-bpm',
+            '/indicators': 'indicadores',
+            '/reports': 'relatorios'
+        };
+        const targetTab = moduleRoutes[window.location.pathname];
+        if (targetTab) {
+            this.showDashboard();
+            const button = document.querySelector(`[data-tab="${targetTab}"]`);
+            if (button) this.switchTab({ currentTarget: button });
+            return;
+        }
         if (window.location.pathname === '/strategic-planning') {
             try {
                 const modules = await AuthManager.get('/modules');
@@ -508,9 +523,13 @@ class SPMApp {
             tab.classList.remove('active');
         });
 
-        const defaultTab = visibleTabs.includes('dashboard-nge') ? 'dashboard-nge' : (visibleTabs.includes('dashboard-setor') ? 'dashboard-setor' : visibleTabs[0] || 'dashboard-setor');
+        const defaultTab = visibleTabs.includes('inicio') ? 'inicio' : (visibleTabs.includes('dashboard-nge') ? 'dashboard-nge' : (visibleTabs.includes('dashboard-setor') ? 'dashboard-setor' : visibleTabs[0] || 'dashboard-setor'));
         document.getElementById(defaultTab)?.classList.add('active');
         document.querySelector(`[data-tab="${defaultTab}"]`)?.classList.add('active');
+        if (defaultTab === 'inicio') {
+            window.HomeManager?.bind();
+            window.HomeManager?.loadSummary().catch((error) => console.error('Erro ao carregar resumo do início:', error));
+        }
     }
 
     /**
@@ -590,6 +609,12 @@ class SPMApp {
         this.loadTabData(tabName);
     }
 
+    navigateFromHome(tabName, path) {
+        history.pushState({}, '', path || '/');
+        const button = document.querySelector(`[data-tab="${tabName}"]`);
+        if (button) this.switchTab({ currentTarget: button });
+    }
+
     showAccessDenied() {
         const activeTab = document.querySelector('.tab-content.active');
         const targetTab = document.getElementById('meus-processos') || document.getElementById('dashboard-setor');
@@ -609,6 +634,9 @@ class SPMApp {
      */
     loadTabData(tabName) {
         switch (tabName) {
+            case 'inicio':
+                window.HomeManager?.loadSummary().catch((error) => console.error('Erro ao carregar resumo do início:', error));
+                break;
             case 'dashboard-nge':
                 if (typeof DashboardManager?.loadNGEDashboard === 'function') {
                     DashboardManager.loadNGEDashboard();

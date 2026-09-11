@@ -300,7 +300,7 @@
     function getVisibleTabs(user) {
         const normalizedUser = normalizeUser(user);
         const profile = getProfile(normalizedUser.accessProfileKey);
-        return Array.isArray(profile?.tabs) ? profile.tabs : [];
+        return Array.isArray(profile?.tabs) ? ['inicio', ...profile.tabs.filter((tab) => tab !== 'inicio')] : [];
     }
 
     function canAccessTab(user, tab) {

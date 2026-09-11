@@ -92,7 +92,7 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '../public/index.html'));
 });
-app.get(['/modules', '/strategic-planning'], (req, res) => {
+app.get(['/modules', '/strategic-planning', '/processes/new', '/processes', '/dashboard', '/bpm', '/indicators', '/reports'], (req, res) => {
     res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
