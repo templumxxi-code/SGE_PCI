@@ -6,7 +6,7 @@ const bcryptjs = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const userRepository = require('../repositories/userRepository');
 const { createSession } = require('../repositories/sessionRepository');
-const { query } = require('../models/db');
+const { query, queryOne } = require('../models/db');
 const { getPermissions, recordLoginAttempt, failedAttemptsSince } = require('../repositories/securityRepository');
 const { normalizePerfil, isProfileAllowed } = require('../services/roles');
 
@@ -152,6 +152,15 @@ const registrar = async (userData) => {
         const perfisValidos = perfisNormalizados.every((item) => isProfileAllowed(item, allowedProfiles));
         if (!perfisValidos || !perfilPrincipal) {
             throw new Error('Perfil inválido');
+        }
+
+        if (perfilPrincipal !== 'NGE') {
+            if (!organizationUnitId) throw new Error('A unidade organizacional é obrigatória');
+            const unit = await queryOne(
+                'SELECT id FROM organizational_units_v2 WHERE id = $1 AND ativo = TRUE',
+                [organizationUnitId]
+            );
+            if (!unit) throw new Error('Unidade organizacional inválida ou inativa');
         }
 
         if (String(senha).length < 8) {

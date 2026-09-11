@@ -7,10 +7,18 @@ const router = express.Router();
 router.get('/tree', verifyToken, async (req, res, next) => {
     try {
         const rows = await queryMany(`
-            SELECT id, nome, sigla, tipo, unidade_superior_id AS parent_id, ativo
-            FROM organizational_units
+            SELECT id,
+                   nome,
+                   sigla,
+                   tipo,
+                   parent_id,
+                   codigo_hierarquico,
+                   nivel_hierarquico,
+                   status,
+                   ativo
+            FROM organizational_units_v2
             WHERE ativo = TRUE
-            ORDER BY tipo, nome
+            ORDER BY string_to_array(codigo_hierarquico, '.')::INTEGER[] NULLS LAST, nome
         `);
         const byId = new Map(rows.map((unit) => [String(unit.id), { ...unit, children: [] }]));
         const roots = [];

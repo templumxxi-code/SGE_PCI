@@ -3,7 +3,7 @@ const bcryptjs = require('bcryptjs');
 const { verifyToken } = require('../middleware/auth');
 const { authorize } = require('../middleware/authorize');
 const { getUserScope } = require('../middleware/scopeAccess');
-const { query } = require('../models/db');
+const { query, queryOne } = require('../models/db');
 const userRepository = require('../repositories/userRepository');
 const { UUID_PATTERN } = require('../middleware/scopeAccess');
 
@@ -27,6 +27,19 @@ const requireUuid = (value, res) => {
     return true;
 };
 
+const validateOrganizationUnit = async (organizationUnitId, res) => {
+    if (!organizationUnitId) return true;
+    const unit = await queryOne(
+        'SELECT id FROM organizational_units_v2 WHERE id = $1 AND ativo = TRUE',
+        [organizationUnitId]
+    );
+    if (!unit) {
+        res.status(400).json({ error: 'Unidade organizacional inválida ou inativa' });
+        return false;
+    }
+    return true;
+};
+
 router.get('/', verifyToken, authorize({ permissions: ['USERS_EDIT'] }), async (req, res, next) => {
     try {
         const scope = await getUserScope(req.user);
@@ -44,6 +57,7 @@ router.post('/', verifyToken, authorize({ permissions: ['USERS_CREATE'] }), asyn
         if (String(senha).length < 8) return res.status(400).json({ error: 'A senha deve ter pelo menos 8 caracteres' });
         const hash = await bcryptjs.hash(String(senha), 12);
         if (organizationUnitId && !UUID_PATTERN.test(String(organizationUnitId))) return res.status(400).json({ error: 'UUID de lotação inválido' });
+        if (!(await validateOrganizationUnit(organizationUnitId, res))) return;
         const user = await userRepository.createUser({
             nome: String(nome).trim(), matricula, email, passwordHash: hash,
             roleCode: String(perfil).trim().toUpperCase(), organizationalUnitId
@@ -76,6 +90,8 @@ router.patch('/:id', verifyToken, async (req, res, next) => {
         if (!isSelf && !(scope.global || scope.unitIds.includes(target.organizationUnitId))) return res.status(403).json({ error: 'Acesso não autorizado à lotação' });
         const isAdmin = scope.global;
         const body = req.body || {};
+        if (body.organizationUnitId && !UUID_PATTERN.test(String(body.organizationUnitId))) return res.status(400).json({ error: 'UUID de lotação inválido' });
+        if (isAdmin && !(await validateOrganizationUnit(body.organizationUnitId, res))) return;
         const passwordHash = body.senha ? await bcryptjs.hash(String(body.senha), 12) : undefined;
         if (body.senha && String(body.senha).length < 8) return res.status(400).json({ error: 'A senha deve ter pelo menos 8 caracteres' });
         const user = await userRepository.updateUser(req.params.id, {

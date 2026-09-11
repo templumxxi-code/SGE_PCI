@@ -16,7 +16,7 @@ class SettingsManager {
         try {
             const canManage = this.canManageUsers();
             await this.loadUsers().catch(() => {});
-            this.renderOrganizationStructure();
+            await this.renderOrganizationStructure();
             this.setupOrganizationForm();
             this.setupUserForm();
             if (canManage) {
@@ -49,14 +49,46 @@ class SettingsManager {
         }
     }
 
-    static renderOrganizationStructure() {
-        const organization = window.AccessControl?.getStoredOrganizationData?.() || { institutes: [], regionais: [], subcoordenações: [], assessorias: [], nuclei: [], sectors: [] };
-        document.getElementById('org-institutes-list').innerHTML = (organization.institutes || []).map(item => `<div class="org-item"><div><strong>${item.name}</strong><p>${item.active ? 'Ativo' : 'Inativo'}</p></div><button type="button" class="btn btn-small btn-danger remove-organization-item" data-type="INSTITUTO" data-id="${item.id}">Remover</button></div>`).join('') || '<p>Nenhum instituto cadastrado.</p>';
-        document.getElementById('org-regionais-list').innerHTML = (organization.regionais || []).map(item => `<div class="org-item"><div><strong>${item.name}</strong><p>${item.active ? 'Ativa' : 'Inativa'}</p></div><button type="button" class="btn btn-small btn-danger remove-organization-item" data-type="REGIONAL" data-id="${item.id}">Remover</button></div>`).join('') || '<p>Nenhuma regional cadastrada.</p>';
-        document.getElementById('org-subcoord-list').innerHTML = (organization.subcoordenações || []).map(item => `<div class="org-item"><div><strong>${item.name}</strong><p>${item.parentType || 'Sem vínculo'}</p></div><button type="button" class="btn btn-small btn-danger remove-organization-item" data-type="SUBCOORDENACAO" data-id="${item.id}">Remover</button></div>`).join('') || '<p>Nenhuma subcoordenação cadastrada.</p>';
-        document.getElementById('org-assessorias-list').innerHTML = (organization.assessorias || []).map(item => `<div class="org-item"><div><strong>${item.name}</strong><p>${item.active ? 'Ativa' : 'Inativa'}</p></div><button type="button" class="btn btn-small btn-danger remove-organization-item" data-type="ASSESSORIA" data-id="${item.id}">Remover</button></div>`).join('') || '<p>Nenhuma assessoria cadastrada.</p>';
-        document.getElementById('org-nuclei-list').innerHTML = (organization.nuclei || []).map(item => `<div class="org-item"><div><strong>${item.name}</strong><p>${item.parentType || 'Sem vínculo'}</p></div><button type="button" class="btn btn-small btn-danger remove-organization-item" data-type="NUCLEO" data-id="${item.id}">Remover</button></div>`).join('') || '<p>Nenhum núcleo cadastrado.</p>';
-        document.getElementById('org-sectors-list').innerHTML = (organization.sectors || []).map(item => `<div class="org-item"><div><strong>${item.name}</strong><p>${item.nucleusId ? `Núcleo ${item.nucleusId}` : 'Sem núcleo'}</p></div><button type="button" class="btn btn-small btn-danger remove-organization-item" data-type="SETOR" data-id="${item.id}">Remover</button></div>`).join('') || '<p>Nenhum setor cadastrado.</p>';
+    static async renderOrganizationStructure() {
+        let tree = [];
+        try {
+            tree = await AuthManager.get('/organization/tree');
+        } catch (error) {
+            console.error('Erro ao carregar árvore organizacional oficial:', error);
+        }
+        const flatten = (nodes, parent = null) => nodes.flatMap((node) => [
+            { ...node, parent },
+            ...flatten(node.children || [], node)
+        ]);
+        const officialUnits = flatten(Array.isArray(tree) ? tree : []);
+        this.officialOrganizationUnits = officialUnits;
+        const byType = (types) => officialUnits.filter((item) => types.includes(item.tipo));
+        const toDisplayItem = (item) => ({
+            id: item.id,
+            name: item.nome,
+            active: item.ativo,
+            code: item.sigla,
+            parentType: item.parent?.nome || 'Unidade superior'
+        });
+        const organization = {
+            institutes: byType(['INSTITUTO']).map(toDisplayItem),
+            regionais: byType(['REGIONAL']).map(toDisplayItem),
+            subcoordenações: byType(['SUBCOORDENACAO']).map(toDisplayItem),
+            assessorias: byType(['ASSESSORIA']).map(toDisplayItem),
+            nuclei: byType(['NUCLEO']).map(toDisplayItem),
+            sectors: byType(['SETOR', 'SERVICO', 'LABORATORIO', 'COMISSAO', 'CORREGEDORIA', 'DIRETORIA', 'ORGAO', 'UNIDADE']).map(toDisplayItem)
+        };
+        const renderGroup = (items, emptyMessage) => items.map(item => `<div class="org-item"><div><strong>${item.name}</strong><p>${item.code || ''} · ${item.active ? 'Ativo' : 'Inativo'} · ${item.parentType || 'Raiz'}</p></div></div>`).join('') || `<p>${emptyMessage}</p>`;
+        document.getElementById('org-institutes-list').innerHTML = renderGroup(organization.institutes, 'Nenhum instituto cadastrado.');
+        document.getElementById('org-regionais-list').innerHTML = renderGroup(organization.regionais, 'Nenhuma regional cadastrada.');
+        document.getElementById('org-subcoord-list').innerHTML = renderGroup(organization.subcoordenações, 'Nenhuma subcoordenação cadastrada.');
+        document.getElementById('org-assessorias-list').innerHTML = renderGroup(organization.assessorias, 'Nenhuma assessoria cadastrada.');
+        document.getElementById('org-nuclei-list').innerHTML = renderGroup(organization.nuclei, 'Nenhum núcleo cadastrado.');
+        document.getElementById('org-sectors-list').innerHTML = renderGroup(organization.sectors, 'Nenhum setor cadastrado.');
+        const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+        const renderTree = (nodes) => nodes.map((node) => `<li><div class="organizational-tree-node"><strong>${escapeHtml(node.nome)}</strong><span>${escapeHtml(node.sigla)} · ${escapeHtml(node.tipo)} · Nível ${node.nivel_hierarquico}</span></div>${node.children?.length ? `<ul>${renderTree(node.children)}</ul>` : ''}</li>`).join('');
+        const treeElement = document.getElementById('organizational-tree');
+        if (treeElement) treeElement.innerHTML = officialUnits.length ? `<ul>${renderTree(tree)}</ul>` : '<p>Nenhuma unidade oficial cadastrada.</p>';
 
         document.querySelectorAll('.remove-organization-item').forEach((button) => {
             button.addEventListener('click', () => {
@@ -1293,6 +1325,24 @@ class SettingsManager {
     }
 
     static getAllOrganizationalAssignments() {
+        if (Array.isArray(this.officialOrganizationUnits)) {
+            return this.officialOrganizationUnits.map((item) => ({
+                key: `${item.tipo}:${item.id}`,
+                id: item.id,
+                name: item.nome,
+                label: this.getOrganizationTypeLabel(item.tipo),
+                type: item.tipo,
+                active: item.ativo !== false && item.status !== 'INACTIVE',
+                parentId: item.parent_id || item.parent?.id || null,
+                organizationUnitId: item.id,
+                path: this.getOfficialOrganizationPath(item),
+                instituteId: null,
+                regionalId: null,
+                advisoryId: null,
+                nucleusId: item.tipo === 'NUCLEO' ? item.id : null,
+                sectorId: item.tipo === 'SETOR' ? item.id : null
+            }));
+        }
         const org = window.AccessControl?.getStoredOrganizationData?.() || {};
         const groups = [
             ['INSTITUTO', 'Institutos', org.institutes || []],
@@ -1315,6 +1365,34 @@ class SettingsManager {
             all.push({ key, id: item.id, type, name: item.name, label, active: item.active !== false, parentId: parent?.id || null, parentType: parent ? (['INSTITUTO', 'REGIONAL', 'ASSESSORIA'].find(parentType => find(parentType, parent.id)) || null) : null, nucleusId: parentNucleus?.id || (type === 'NUCLEO' ? item.id : null), organizationUnitId: type === 'INSTITUTO' || type === 'REGIONAL' || type === 'ASSESSORIA' ? item.id : parent?.id || null, instituteId: type === 'INSTITUTO' ? item.id : parent?.instituteId || (parent && find('INSTITUTO', parent.id)?.id) || null, regionalId: type === 'REGIONAL' ? item.id : parent?.regionalId || (parent && find('REGIONAL', parent.id)?.id) || null, advisoryId: type === 'ASSESSORIA' ? item.id : parent?.assessoriaId || (parent && find('ASSESSORIA', parent.id)?.id) || null, sectorId: type === 'SETOR' ? item.id : null, path: hierarchy || item.name });
         }));
         return all;
+    }
+
+    static getOrganizationTypeLabel(type) {
+        const labels = {
+            ORGAO: 'Órgãos superiores',
+            CORREGEDORIA: 'Corregedoria',
+            DIRETORIA: 'Diretorias',
+            INSTITUTO: 'Institutos',
+            SUBCOORDENACAO: 'Subcoordenações',
+            ASSESSORIA: 'Assessorias',
+            NUCLEO: 'Núcleos',
+            SETOR: 'Setores',
+            SERVICO: 'Serviços',
+            LABORATORIO: 'Laboratórios',
+            COMISSAO: 'Comissões',
+            UNIDADE: 'Unidades'
+        };
+        return labels[type] || 'Unidades organizacionais';
+    }
+
+    static getOfficialOrganizationPath(item) {
+        const names = [];
+        let current = item;
+        while (current) {
+            names.unshift(current.nome);
+            current = current.parent || null;
+        }
+        return names.join(' → ');
     }
 
     static getAssignmentById(key) {
@@ -1346,7 +1424,7 @@ class SettingsManager {
             select.insertAdjacentHTML('beforeend', '<option value="NGE:NGE">NGE — Núcleo de Gestão Estratégica</option>');
         }
         groups.forEach((group, type) => {
-            const options = group.items.map(item => `<option value="${item.key}" ${allowed.length && !allowed.includes(type) ? 'disabled' : ''}>${item.name}${item.path !== item.name ? ` — ${item.path}` : ''}</option>`).join('');
+                const options = group.items.map(item => `<option value="${item.key}" ${allowed.length && !allowed.includes(type) ? 'disabled' : ''}>${item.name}${item.path !== item.name ? ` — ${item.path}` : ''}</option>`).join('');
             if (options) select.insertAdjacentHTML('beforeend', `<optgroup label="${group.label}">${options}</optgroup>`);
         });
         if ([...select.options].some(option => option.value === current)) select.value = current;
@@ -1359,9 +1437,7 @@ class SettingsManager {
         if (key === 'NGE:NGE' || String(perfil).toUpperCase() === 'NGE') return { perfil, organizationType: '', organizationUnitId: null, instituteId: null, regionalId: null, advisoryId: null, nucleusId: null, sectorId: null, lotacaoId: null, lotacaoType: 'NGE', unitName: 'NGE — Núcleo de Gestão Estratégica', nucleusName: null, sectorName: null };
         const assignment = this.getAssignmentById(key);
         if (!assignment) return { perfil, organizationType: '', organizationUnitId: null, instituteId: null, regionalId: null, advisoryId: null, nucleusId: null, sectorId: null, lotacaoId: null, lotacaoType: '' };
-        const org = window.AccessControl?.getStoredOrganizationData?.() || {};
-        const find = (list, id) => (org[list] || []).find(item => String(item.id) === String(id));
-        return { perfil, organizationType: assignment.type, organizationUnitId: assignment.organizationUnitId, instituteId: assignment.instituteId, regionalId: assignment.regionalId, advisoryId: assignment.advisoryId, nucleusId: assignment.nucleusId, sectorId: assignment.sectorId, lotacaoId: assignment.id, lotacaoType: assignment.type, unitName: assignment.path, nucleusName: find('nuclei', assignment.nucleusId)?.name || null, sectorName: find('sectors', assignment.sectorId)?.name || null };
+        return { perfil, organizationType: assignment.type, organizationUnitId: assignment.organizationUnitId, instituteId: assignment.instituteId, regionalId: assignment.regionalId, advisoryId: assignment.advisoryId, nucleusId: assignment.nucleusId, sectorId: assignment.sectorId, lotacaoId: assignment.id, lotacaoType: assignment.type, unitName: assignment.path, nucleusName: assignment.name, sectorName: assignment.type === 'SETOR' ? assignment.name : null };
     }
 
     static validateUserOrganizationalAssignment(userData = {}) {
