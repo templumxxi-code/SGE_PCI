@@ -5,6 +5,7 @@
 class DashboardManager {
     static chartInstances = {};
     static refreshTimer = null;
+    static organizationUnits = [];
     static DEFAULT_PHASE_LABELS = ['Planejar', 'Analisar', 'Desenhar', 'Implementar', 'Monitorar'];
 
     /**
@@ -75,19 +76,39 @@ class DashboardManager {
     static getNgeDashboardFilteredProcesses(processes, filters = {}) {
         const value = (processo, keys) => keys.map(key => processo?.[key]).find(item => item !== undefined && item !== null && item !== '');
         return (Array.isArray(processes) ? processes : []).filter((processo) => {
-            const unitType = value(processo, ['tipo_unidade', 'unitType', 'unidade_tipo']);
-            const unitId = value(processo, ['unidade_id', 'unitId', 'organizationUnitId', 'organization_unit_id', 'instituteId', 'instituto_id', 'regionalId', 'regional_id', 'advisoryId', 'advisory_id', 'setor_id']);
+            const unitId = value(processo, ['organizational_unit_id', 'organizationUnitId', 'unidade_id', 'unitId', 'setor_id', 'sectorId', 'sector_id']);
+            const unit = this.organizationUnits.find(item => String(item.id) === String(unitId));
+            const unitChain = unit ? [unit, ...unit.ancestors] : [];
+            const unitType = value(processo, ['tipo_unidade', 'unitType', 'unidade_tipo']) || unit?.tipo;
             const nucleusId = value(processo, ['nucleo_id', 'nucleusId']);
             const sectorId = value(processo, ['setor_id', 'sectorId', 'sector_id']);
             const responsibleId = value(processo, ['responsavel_id', 'responsibleId']);
             const phase = this.getProcessCurrentPhase(processo);
             const status = value(processo, ['status', 'status_processo', 'status_fase']);
             const matches = (filter, current) => !filter || String(filter).toLowerCase() === String(current ?? '').toLowerCase();
-            return matches(filters.unitType, unitType) && matches(filters.unitId, unitId) &&
-                matches(filters.nucleusId, nucleusId) && matches(filters.sectorId, sectorId) &&
+            const matchesUnitType = !filters.unitType || unitChain.some(item => String(item.tipo).toUpperCase() === String(filters.unitType).toUpperCase()) || matches(filters.unitType, unitType);
+            const matchesUnit = !filters.unitId || unitChain.some(item => String(item.id) === String(filters.unitId));
+            const resolvedNucleusId = nucleusId || unitChain.find(item => item.tipo === 'NUCLEO')?.id;
+            const resolvedSectorId = sectorId || unitChain.find(item => item.tipo === 'SETOR')?.id;
+            return matchesUnitType && matchesUnit &&
+                matches(filters.nucleusId, resolvedNucleusId) && matches(filters.sectorId, resolvedSectorId) &&
                 matches(filters.responsibleId, responsibleId) && matches(filters.processId, processo.id) &&
                 matches(filters.phase, phase) && matches(filters.status, status);
         });
+    }
+
+    static async loadOrganizationUnits() {
+        try {
+            const tree = await AuthManager.get('/organization/tree');
+            const flatten = (nodes, ancestors = []) => nodes.flatMap(node => [
+                { ...node, ancestors },
+                ...flatten(node.children || [], [...ancestors, node])
+            ]);
+            this.organizationUnits = flatten(Array.isArray(tree) ? tree : []);
+        } catch (error) {
+            console.error('Erro ao carregar unidades para os filtros do dashboard:', error);
+            this.organizationUnits = [];
+        }
     }
 
     static getProcessCurrentPhase(processo) {
@@ -254,12 +275,16 @@ class DashboardManager {
 
     static async loadNGEDashboard() {
         try {
+            if (!this.organizationUnits.length) await this.loadOrganizationUnits();
+            if (typeof this.refreshNgeFilterOptions === 'function') this.refreshNgeFilterOptions();
             const context = this.getDashboardContext(window.app?.currentUser);
             const title = document.getElementById('dashboard-nge-title');
             const subtitle = document.getElementById('dashboard-nge-subtitle');
             if (title) title.textContent = context.dashboardTitle;
             if (subtitle) subtitle.textContent = context.dashboardSubtitle;
-            const dados = window.bpmApi ? await window.bpmApi.getDashboard('nge') : await api.get('/reports/dashboard');
+            const dados = window.bpmApi
+                ? await window.bpmApi.getDashboard('nge', this.dashboardFilters || {})
+                : await api.get('/reports/dashboard');
             this.updateNgeDashboard(dados);
             this.renderConformanceChart(dados);
             this.renderDistributionChart(dados);
@@ -840,17 +865,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 element.value = [...element.options].some(option => option.value === current) ? current : '';
             };
             const selected = dashboard.getNgeDashboardFilteredProcesses(processes, dashboard.dashboardFilters);
-            const organization = window.AccessControl?.getStoredOrganizationData?.() || {};
-            const institutionalUnits = (organization.regionais || []).map(item => ({ value: item.id, label: item.name }));
-            options('[data-nge-filter="unitId"]', institutionalUnits.length ? institutionalUnits : selected.map(item => ({ value: item.unidade_id ?? item.unitId ?? item.regionalId ?? item.regional_id, label: item.unidade_nome || item.regional_nome || 'Unidade não informada' })), 'Todas as unidades', true);
-            options('[data-nge-filter="nucleusId"]', selected.map(item => ({ value: item.nucleo_id ?? item.nucleusId, label: item.nucleo_nome || 'Núcleo não informado' })), 'Todos os núcleos');
-            options('[data-nge-filter="sectorId"]', selected.map(item => ({ value: item.setor_id ?? item.sectorId, label: item.setor_nome || 'Setor não informado' })), 'Todos os setores');
+            const officialUnits = dashboard.organizationUnits.filter(item => item.tipo !== 'ORGAO');
+            const fallback = selected.map(item => ({ value: item.organizational_unit_id ?? item.organizationUnitId ?? item.setor_id, label: item.unit_name || item.unidade_nome || item.setor_nome || 'Unidade não informada' }));
+            options('[data-nge-filter="unitId"]', officialUnits.map(item => ({ value: item.id, label: item.nome })), 'Todas as unidades', true);
+            options('[data-nge-filter="nucleusId"]', officialUnits.filter(item => item.tipo === 'NUCLEO').map(item => ({ value: item.id, label: item.nome })), 'Todos os núcleos');
+            options('[data-nge-filter="sectorId"]', officialUnits.filter(item => ['SETOR', 'SERVICO', 'LABORATORIO'].includes(item.tipo)).map(item => ({ value: item.id, label: item.nome })), 'Todos os setores');
             options('[data-nge-filter="responsibleId"]', selected.map(item => ({ value: item.responsavel_id ?? item.responsibleId, label: item.responsavel_nome || item.responsavel || 'Responsável não informado' })), 'Todos os responsáveis');
             options('[data-nge-filter="processId"]', selected.map(item => ({ value: item.id, label: item.nome || `Processo ${item.id}` })), 'Todos os processos');
             options('[data-nge-filter="status"]', selected.map(item => ({ value: item.status || item.status_processo || item.status_fase, label: item.status || item.status_processo || item.status_fase })), 'Todos os status');
         };
-        refreshFilterOptions();
-        const refreshDashboard = () => { refreshFilterOptions(); dashboard.loadNGEDashboard(); };
+        dashboard.loadOrganizationUnits().then(refreshFilterOptions);
+        const refreshDashboard = async () => {
+            if (!dashboard.organizationUnits.length) await dashboard.loadOrganizationUnits();
+            refreshFilterOptions();
+            dashboard.loadNGEDashboard();
+        };
+        dashboard.refreshNgeFilterOptions = refreshFilterOptions;
         const dashboardSearchInput = filterContainer?.querySelector('[data-nge-search="search"]');
         if (dashboardSearchInput) {
             dashboardSearchInput.value = dashboard.dashboardFilters?.search || '';

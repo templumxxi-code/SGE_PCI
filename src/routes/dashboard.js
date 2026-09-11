@@ -19,7 +19,45 @@ const dashboardFilters = (scope, queryParams, params) => {
         clauses.push(`p.organizational_unit_id = ANY($${params.length}::uuid[])`);
     } else if (queryParams.unit_id) {
         params.push(queryParams.unit_id);
-        clauses.push(`p.organizational_unit_id = $${params.length}`);
+        clauses.push(`p.organizational_unit_id IN (
+            WITH RECURSIVE descendants AS (
+                SELECT id FROM organizational_units_v2 WHERE id = $${params.length}::uuid
+                UNION ALL
+                SELECT child.id FROM organizational_units_v2 child
+                JOIN descendants parent ON child.parent_id = parent.id
+                WHERE child.ativo = TRUE
+            )
+            SELECT id FROM descendants
+        )`);
+    }
+    const addHierarchyFilter = (selectedId) => {
+        params.push(selectedId);
+        const idPosition = params.length;
+        clauses.push(`p.organizational_unit_id IN (
+            WITH RECURSIVE descendants AS (
+                SELECT id, tipo FROM organizational_units_v2 WHERE id = $${idPosition}::uuid
+                UNION ALL
+                SELECT child.id, child.tipo FROM organizational_units_v2 child
+                JOIN descendants parent ON child.parent_id = parent.id
+                WHERE child.ativo = TRUE
+            )
+            SELECT id FROM descendants
+        )`);
+    };
+    if (queryParams.nucleus_id) addHierarchyFilter(queryParams.nucleus_id);
+    if (queryParams.sector_id) addHierarchyFilter(queryParams.sector_id);
+    if (queryParams.unit_type) {
+        params.push(queryParams.unit_type);
+        clauses.push(`EXISTS (
+            WITH RECURSIVE ancestors AS (
+                SELECT id, parent_id, tipo FROM organizational_units_v2 WHERE id = p.organizational_unit_id
+                UNION ALL
+                SELECT parent.id, parent.parent_id, parent.tipo
+                FROM organizational_units_v2 parent
+                JOIN ancestors child ON child.parent_id = parent.id
+            )
+            SELECT 1 FROM ancestors WHERE tipo = $${params.length}
+        )`);
     }
     if (queryParams.status) { params.push(queryParams.status); clauses.push(`p.status = $${params.length}`); }
     if (queryParams.phase) { params.push(queryParams.phase); clauses.push(`p.current_phase = $${params.length}`); }
