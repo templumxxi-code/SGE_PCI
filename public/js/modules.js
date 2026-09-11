@@ -16,14 +16,40 @@ class ModulesManager {
     static render() {
         const container = document.getElementById('modules-list');
         if (!container) return;
-        container.innerHTML = this.modules.map((module) => `
-            <article class="module-card">
-                <div class="module-card-icon">${module.code === 'STRATEGIC_PLANNING' ? '🎯' : '⚙️'}</div>
-                <h2>${this.escape(module.name)}</h2>
-                <p>${this.escape(module.description)}.</p>
-                <button type="button" class="btn btn-primary module-access-btn" data-module-code="${this.escape(module.code)}">Acessar</button>
-            </article>
-        `).join('') || '<p class="module-empty">Nenhum módulo foi liberado para seu usuário.</p>';
+        const processModule = this.modules.find((module) => module.code === 'PROCESS_MANAGEMENT');
+        const strategicModule = this.modules.find((module) => module.code === 'STRATEGIC_PLANNING');
+        const cards = [
+            processModule || {
+                name: 'Gestão de Processos',
+                code: 'PROCESS_MANAGEMENT',
+                description: 'Gerenciamento de processos organizacionais',
+                enabled: false
+            },
+            strategicModule || {
+                name: 'Planejamento Estratégico',
+                code: 'STRATEGIC_PLANNING',
+                description: 'Planejamento estratégico institucional',
+                enabled: false
+            }
+        ];
+
+        container.innerHTML = cards.map((module) => {
+            const available = module.enabled !== false;
+            const isStrategic = module.code === 'STRATEGIC_PLANNING';
+            return `
+                <article class="module-card${available ? '' : ' module-card-disabled'}">
+                    <div class="module-card-icon" aria-hidden="true">${isStrategic ? '◈' : '⚙'}</div>
+                    <div class="module-card-content">
+                        <span class="module-card-status">${available ? 'Disponível' : 'Em desenvolvimento'}</span>
+                        <h2>${this.escape(module.name)}</h2>
+                        <p>${this.escape(module.description)}.</p>
+                        ${available
+                            ? `<button type="button" class="btn btn-primary module-access-btn" data-module-code="${this.escape(module.code)}">Acessar módulo</button>`
+                            : '<button type="button" class="btn module-access-btn" disabled>Em breve</button>'}
+                    </div>
+                </article>
+            `;
+        }).join('');
 
         container.querySelectorAll('.module-access-btn').forEach((button) => {
             button.addEventListener('click', () => this.open(button.dataset.moduleCode));
