@@ -100,6 +100,33 @@ const changePassword = async (id, passwordHash) => {
     return Boolean(row);
 };
 
+const createPasswordResetToken = async (userId, tokenHash, expiresAt) => {
+    await query('DELETE FROM password_reset_tokens WHERE user_id = $1 OR expires_at < CURRENT_TIMESTAMP', [userId]);
+    const row = await queryOne(
+        `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+         VALUES ($1, $2, $3)
+         RETURNING id`,
+        [userId, tokenHash, expiresAt]
+    );
+    return Boolean(row);
+};
+
+const consumePasswordResetToken = async (email, tokenHash) => {
+    const row = await queryOne(
+        `UPDATE password_reset_tokens t
+         SET used_at = CURRENT_TIMESTAMP
+         FROM users u
+         WHERE t.user_id = u.id
+           AND LOWER(u.email) = LOWER($1)
+           AND t.token_hash = $2
+           AND t.used_at IS NULL
+           AND t.expires_at > CURRENT_TIMESTAMP
+         RETURNING t.user_id`,
+        [email, tokenHash]
+    );
+    return row?.user_id || null;
+};
+
 module.exports = {
     findUserByEmail,
     findUserById,
@@ -108,5 +135,7 @@ module.exports = {
     createUser,
     updateUser,
     disableUser,
-    changePassword
+    changePassword,
+    createPasswordResetToken,
+    consumePasswordResetToken
 };

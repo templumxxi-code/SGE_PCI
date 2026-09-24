@@ -177,6 +177,16 @@ class SPMApp {
             resetPasswordForm.addEventListener('submit', (e) => this.handleResetPassword(e));
         }
 
+        const firstAccessForm = document.getElementById('first-access-form');
+        if (firstAccessForm) {
+            firstAccessForm.addEventListener('submit', (e) => this.handleFirstAccessPassword(e));
+        }
+
+        const btnBackToLoginFromFirstAccess = document.getElementById('btn-back-to-login-from-first-access');
+        if (btnBackToLoginFromFirstAccess) {
+            btnBackToLoginFromFirstAccess.addEventListener('click', () => this.backToLogin());
+        }
+
         // Modal close buttons
         document.querySelectorAll('[data-dismiss="modal"]').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -270,7 +280,7 @@ class SPMApp {
             try {
                 const response = await fetch(`${this.apiUrl}/auth/perfil`, {
                     headers: {
-                        'Authorization': `Bearer ${token}`
+                        'Authorization': 'Bearer ' + token
                     }
                 });
 
@@ -343,6 +353,18 @@ class SPMApp {
 
             if (response.ok) {
                 const data = await response.json();
+
+                if (data?.mustChangePassword) {
+                    this.removeToken();
+                    this.showFirstAccessPasswordForm(data.usuario?.email || email);
+                    const alert = document.getElementById('login-error-message');
+                    if (alert) {
+                        alert.textContent = data.message || 'Sua senha temporária precisa ser alterada antes do primeiro acesso.';
+                        alert.classList.add('visible');
+                    }
+                    return;
+                }
+
                 this.setToken(data.token);
                 this.currentUser = data.usuario;
                 this.currentUser.perfil = this.normalizeProfile(this.currentUser.perfil);
@@ -412,7 +434,7 @@ class SPMApp {
     /**
      * Mostrar dashboard
      */
-    showDashboard() {
+    async showDashboard() {
         const loginSection = document.getElementById('login-section');
         const dashboardSection = document.getElementById('dashboard-section');
         const modulesSection = document.getElementById('modules-section');
@@ -433,7 +455,7 @@ class SPMApp {
         // Ajustar navegação e abas conforme perfil
         this.applyRolePermissions();
         this.prepareCreateProcessForm();
-        ProcessManager.initializeCreateProcessForm();
+        await ProcessManager.initializeCreateProcessForm();
 
         // Carregar dados iniciais
         this.loadDashboardData();
@@ -480,6 +502,8 @@ class SPMApp {
                 document.getElementById('modules-section')?.classList.remove('active');
                 document.getElementById('dashboard-section')?.classList.remove('active');
                 document.getElementById('strategic-planning-section')?.classList.add('active');
+                const strategicContainer = document.getElementById('strategic-planning-container');
+                if (strategicContainer) await window.StrategicPlanning?.load(strategicContainer);
             } catch (error) {
                 this.showModules();
             }
@@ -652,6 +676,11 @@ class SPMApp {
                     ProcessManager.loadProcesses();
                 }
                 break;
+            case 'novo-processo':
+                if (typeof ProcessManager?.initializeCreateProcessForm === 'function') {
+                    ProcessManager.initializeCreateProcessForm();
+                }
+                break;
             case 'aprovacoes':
                 if (typeof DashboardManager?.renderApprovalQueue === 'function') {
                     DashboardManager.renderApprovalQueue(this.currentUser);
@@ -733,13 +762,8 @@ class SPMApp {
         }
 
         try {
-            const result = await api.requestPasswordReset(email);
+            await api.requestPasswordReset(email);
             
-            // Mostrar token e link para o dev
-            document.getElementById('recovery-token-display').textContent = `Token: ${result.token}`;
-            document.getElementById('recovery-link-display').textContent = `${window.location.origin}/?reset=${result.token}`;
-            document.getElementById('recovery-link-display').href = `${window.location.origin}/?reset=${result.token}`;
-
             // Mostrar step 2
             document.getElementById('forgot-password-step1').style.display = 'none';
             document.getElementById('forgot-password-step2').style.display = 'block';
@@ -754,16 +778,78 @@ class SPMApp {
     backToLogin() {
         const modal = document.getElementById('forgot-password-modal');
         const resetSection = document.getElementById('reset-password-section');
+        const firstAccessSection = document.getElementById('first-access-section');
         const loginSection = document.getElementById('login-section');
 
         if (modal) modal.style.display = 'none';
         if (resetSection) resetSection.style.display = 'none';
+        if (firstAccessSection) firstAccessSection.style.display = 'none';
         if (loginSection) loginSection.style.display = 'block';
         loginSection.classList.add('active');
 
         // Reset do formulário
         const resetForm = document.getElementById('reset-password-form');
         if (resetForm) resetForm.reset();
+        const firstAccessForm = document.getElementById('first-access-form');
+        if (firstAccessForm) firstAccessForm.reset();
+    }
+
+    showFirstAccessPasswordForm(email = '') {
+        const loginSection = document.getElementById('login-section');
+        const firstAccessSection = document.getElementById('first-access-section');
+
+        if (loginSection) {
+            loginSection.classList.remove('active');
+            loginSection.style.display = 'none';
+        }
+
+        if (firstAccessSection) {
+            firstAccessSection.style.display = 'block';
+            firstAccessSection.classList.add('active');
+        }
+
+        const emailField = document.getElementById('first-access-email');
+        if (emailField) emailField.value = email;
+
+        const currentPasswordField = document.getElementById('first-access-current-password');
+        if (currentPasswordField) currentPasswordField.focus();
+    }
+
+    async handleFirstAccessPassword(event) {
+        event.preventDefault();
+
+        const email = document.getElementById('first-access-email')?.value.trim();
+        const senhaAtual = document.getElementById('first-access-current-password')?.value || '';
+        const novaSenha = document.getElementById('first-access-new-password')?.value || '';
+        const confirmacao = document.getElementById('first-access-confirm-password')?.value || '';
+
+        if (!email) {
+            alert('Informe o e-mail do usuário.');
+            return;
+        }
+
+        if (!senhaAtual || !novaSenha || !confirmacao) {
+            alert('Preencha a senha atual, a nova senha e a confirmação.');
+            return;
+        }
+
+        if (novaSenha !== confirmacao) {
+            alert('As senhas não coincidem.');
+            return;
+        }
+
+        if (novaSenha.length < 8) {
+            alert('A nova senha deve ter pelo menos 8 caracteres.');
+            return;
+        }
+
+        try {
+            await api.firstAccessPassword(email, senhaAtual, novaSenha);
+            alert('Senha atualizada com sucesso! Faça login com sua nova senha.');
+            this.backToLogin();
+        } catch (error) {
+            alert(error.message || 'Não foi possível atualizar a senha.');
+        }
     }
 
     /**
@@ -782,8 +868,8 @@ class SPMApp {
             return;
         }
 
-        if (novaSenha.length < 6) {
-            alert('A senha deve ter no mínimo 6 caracteres.');
+        if (novaSenha.length < 8) {
+            alert('A senha deve ter no mínimo 8 caracteres.');
             return;
         }
 

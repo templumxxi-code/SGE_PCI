@@ -877,9 +877,3 @@ textarea {
 .text-muted {
     color: var(--color-text-secondary);
 }
-
-#recovery-token-display,
-#recovery-link-display {
-    word-break: break-all;
-    font-family: monospace;
-}

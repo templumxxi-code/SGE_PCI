@@ -9,6 +9,8 @@ const { createSession } = require('../repositories/sessionRepository');
 const { query, queryOne } = require('../models/db');
 const { getPermissions, recordLoginAttempt, failedAttemptsSince } = require('../repositories/securityRepository');
 const { normalizePerfil, isProfileAllowed } = require('../services/roles');
+const crypto = require('crypto');
+const { sendPasswordResetEmail } = require('../services/passwordResetService');
 
 const createAuthError = (message, statusCode = 401) => {
     const error = new Error(message);
@@ -66,6 +68,32 @@ const login = async (email, senha, perfilSolicitado = null, request = null) => {
 
         const permissions = await getPermissions(usuario.id);
 
+        if (Boolean(usuario.mustChangePassword)) {
+            await recordLoginAttempt(emailNormalizado, request?.ip, false, 'PASSWORD_CHANGE_REQUIRED');
+            await recordAuthAudit(usuario.id, 'PASSWORD_CHANGE_REQUIRED', request);
+            return {
+                token: null,
+                mustChangePassword: true,
+                message: 'Senha temporária precisa ser alterada antes do primeiro acesso.',
+                usuario: {
+                    id: usuario.id,
+                    nome: usuario.nome,
+                    email: usuario.email,
+                    perfil: normalizePerfil(usuario.perfil || usuario.role || 'OPERACIONAL'),
+                    setor_id: usuario.setor_id || usuario.sectorId || null,
+                    organizationType: usuario.organizationType || 'SETOR',
+                    organizationUnitId: usuario.organizationUnitId || null,
+                    instituteId: usuario.instituteId || null,
+                    regionalId: usuario.regionalId || null,
+                    advisoryId: usuario.advisoryId || null,
+                    nucleusId: usuario.nucleusId || null,
+                    sectorId: usuario.sectorId || usuario.setor_id || null,
+                    active: usuario.active,
+                    mustChangePassword: true
+                }
+            };
+        }
+
         // Se um perfil foi solicitado, validar se o usuário tem esse perfil
         let perfilNormalizado = normalizePerfil(usuario.perfil || usuario.role);
         
@@ -115,7 +143,8 @@ const login = async (email, senha, perfilSolicitado = null, request = null) => {
                 advisoryId: usuario.advisoryId || null,
                 nucleusId: usuario.nucleusId || null,
                 sectorId: usuario.sectorId || usuario.setor_id || null,
-                active: usuario.active
+                active: usuario.active,
+                mustChangePassword: Boolean(usuario.mustChangePassword)
             }
         };
     } catch (error) {
@@ -293,6 +322,10 @@ const alterarSenha = async (usuarioId, senhaAtual, novaSenha) => {
             throw new Error('Senha atual inválida');
         }
 
+        if (String(novaSenha || '').length < 8) {
+            throw new Error('A nova senha deve ter pelo menos 8 caracteres');
+        }
+
         const passwordHash = await bcryptjs.hash(String(novaSenha), 12);
         await userRepository.changePassword(usuarioId, passwordHash);
         await recordAuthAudit(usuarioId, 'PASSWORD_CHANGED');
@@ -301,6 +334,70 @@ const alterarSenha = async (usuarioId, senhaAtual, novaSenha) => {
     } catch (error) {
         throw error;
     }
+};
+
+const alterarSenhaPrimeiroAcesso = async (email, senhaAtual, novaSenha) => {
+    try {
+        const emailNormalizado = String(email || '').trim().toLowerCase();
+        if (!emailNormalizado || !senhaAtual || !novaSenha) {
+            throw new Error('E-mail, senha atual e nova senha são obrigatórios');
+        }
+
+        const usuario = await userRepository.findUserByEmail(emailNormalizado);
+        if (!usuario || !usuario.active) {
+            throw new Error('Usuário não encontrado ou inativo');
+        }
+
+        const senhaValida = await bcryptjs.compare(String(senhaAtual || ''), usuario.passwordHash || '');
+        if (!senhaValida) {
+            throw new Error('Senha atual inválida');
+        }
+
+        if (String(novaSenha || '').length < 8) {
+            throw new Error('A nova senha deve ter pelo menos 8 caracteres');
+        }
+
+        const passwordHash = await bcryptjs.hash(String(novaSenha), 12);
+        await userRepository.changePassword(usuario.id, passwordHash);
+        await recordAuthAudit(usuario.id, 'PASSWORD_CHANGED_FIRST_ACCESS');
+
+        return { mensagem: 'Senha atualizada com sucesso. Faça login com sua nova senha.' };
+    } catch (error) {
+        throw error;
+    }
+};
+
+const solicitarResetSenha = async (email) => {
+    const emailNormalizado = String(email || '').trim().toLowerCase();
+    const usuario = await userRepository.findUserByEmail(emailNormalizado);
+
+    if (usuario?.active) {
+        const token = crypto.randomBytes(32).toString('hex');
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        const ttlMinutes = Math.max(5, Number(process.env.PASSWORD_RESET_TTL_MINUTES || 30));
+        const expiresAt = new Date(Date.now() + ttlMinutes * 60 * 1000);
+        await userRepository.createPasswordResetToken(usuario.id, tokenHash, expiresAt);
+        const baseUrl = process.env.APP_BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+        await sendPasswordResetEmail(usuario.email, `${baseUrl}/?reset=${token}`);
+        await recordAuthAudit(usuario.id, 'PASSWORD_RESET_REQUESTED');
+    }
+
+    return { mensagem: 'Se o e-mail estiver cadastrado, você receberá um link para redefinir sua senha.' };
+};
+
+const resetarSenha = async (email, token, novaSenha) => {
+    if (!email || !token || String(novaSenha || '').length < 8) {
+        throw new Error('E-mail, token e senha com pelo menos 8 caracteres são obrigatórios');
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(String(token)).digest('hex');
+    const userId = await userRepository.consumePasswordResetToken(String(email).trim().toLowerCase(), tokenHash);
+    if (!userId) throw new Error('Link de redefinição inválido ou expirado');
+
+    const passwordHash = await bcryptjs.hash(String(novaSenha), 12);
+    await userRepository.changePassword(userId, passwordHash);
+    await recordAuthAudit(userId, 'PASSWORD_RESET_COMPLETED');
+    return { mensagem: 'Senha redefinida com sucesso. Faça login com sua nova senha.' };
 };
 
 /**
@@ -395,6 +492,9 @@ module.exports = {
     obterUsuario,
     atualizarUsuario,
     alterarSenha,
+    alterarSenhaPrimeiroAcesso,
+    solicitarResetSenha,
+    resetarSenha,
     deletarUsuario,
     obterPerfisDisponíveis,
     atualizarStatusUsuario

@@ -29,6 +29,24 @@ router.post('/login', loginLimiter, async (req, res, next) => {
     }
 });
 
+router.post('/solicitar-reset-senha', loginLimiter, async (req, res, next) => {
+    try {
+        await authController.solicitarResetSenha(req.body.email);
+        res.json({ mensagem: 'Se o e-mail estiver cadastrado, você receberá um link para redefinir sua senha.' });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.post('/reset-senha', async (req, res, next) => {
+    try {
+        const { email, token, novaSenha } = req.body;
+        res.json(await authController.resetarSenha(email, token, novaSenha));
+    } catch (error) {
+        next(error);
+    }
+});
+
 /**
  * GET /api/auth/opcoes-login
  * Listar usuários ativos sem dados sensíveis para a tela de login
@@ -144,6 +162,25 @@ router.post('/alterar-senha', verifyToken, async (req, res, next) => {
         }
 
         const resultado = await authController.alterarSenha(req.user.id, senhaAtual, novaSenha);
+        res.json(resultado);
+    } catch (error) {
+        next(error);
+    }
+});
+
+/**
+ * POST /api/auth/primeiro-acesso
+ * Usuário com senha temporária define a nova senha antes de acessar o sistema.
+ */
+router.post('/primeiro-acesso', async (req, res, next) => {
+    try {
+        const { email, senhaAtual, novaSenha } = req.body;
+
+        if (!email || !senhaAtual || !novaSenha) {
+            return res.status(400).json({ error: 'E-mail, senha atual e nova senha são obrigatórios' });
+        }
+
+        const resultado = await authController.alterarSenhaPrimeiroAcesso(email, senhaAtual, novaSenha);
         res.json(resultado);
     } catch (error) {
         next(error);
